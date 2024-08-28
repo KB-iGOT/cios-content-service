@@ -1,6 +1,7 @@
 package com.igot.cios.controller;
 
 import com.igot.cios.dto.RequestDto;
+import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.service.CiosContentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/ciosIntegration")
@@ -17,13 +20,13 @@ public class CiosContentController {
     CiosContentService ciosContentService;
 
     @PostMapping(value = "/v1/loadContentFromExcel", consumes = "multipart/form-data")
-    public ResponseEntity<String> loadContentFromExcel(@RequestParam(value = "file") MultipartFile file,@RequestParam(value="partnerName")String name) {
+    public ResponseEntity<String> loadContentFromExcel(@RequestParam(value = "file") MultipartFile file, @RequestParam(value = "partnerName") String name) {
         try {
-            ciosContentService.loadContentFromExcel(file,name);
+            ciosContentService.loadContentFromExcel(file, name);
             return ResponseEntity.ok("Loading of content from excel is successful.");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Error during loading of content from excel: " + e.getMessage());
+                    .body("Error during loading of content from excel: " + e.getMessage());
         }
     }
 
@@ -38,13 +41,23 @@ public class CiosContentController {
     }
 
     @PostMapping(value = "/v1/loadContentProgressFromExcel", consumes = "multipart/form-data")
-    public ResponseEntity<String> loadContentProgressFromExcel(@RequestParam(value = "file") MultipartFile file,@RequestParam(value="partnerName") String providerName) {
+    public ResponseEntity<String> loadContentProgressFromExcel(@RequestParam(value = "file") MultipartFile file, @RequestParam(value = "partnerName") String providerName) {
         try {
-            ciosContentService.loadContentProgressFromExcel(file,providerName);
+            ciosContentService.loadContentProgressFromExcel(file, providerName);
             return ResponseEntity.ok("Loading of content from excel is successful.");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error during loading of content from excel: " + e.getMessage());
         }
     }
+
+    @GetMapping("/v1/file/info/{partnerId}")
+    public ResponseEntity<List<FileInfoEntity>> getAllFileInfosByPartnerId(@PathVariable String partnerId) {
+        List<FileInfoEntity> fileInfos = ciosContentService.getAllFileInfos(partnerId);
+        if (fileInfos.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(fileInfos);
+    }
+
 }

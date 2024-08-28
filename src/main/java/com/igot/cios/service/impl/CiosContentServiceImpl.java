@@ -6,16 +6,19 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.constant.ContentSource;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
 import com.igot.cios.entity.ContentPartnerEntity;
 import com.igot.cios.entity.CornellContentEntity;
+import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.entity.UpgradContentEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.repository.ContentPartnerRepository;
 import com.igot.cios.repository.CornellContentRepository;
+import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.repository.UpgradContentRepository;
 import com.igot.cios.service.CiosContentService;
 import com.igot.cios.util.CbServerProperties;
@@ -62,15 +65,24 @@ public class CiosContentServiceImpl implements CiosContentService {
     private CacheService cacheService;
     @Autowired
     private CbServerProperties cbServerProperties;
-
+    @Autowired
+    private FileInfoRepository fileInfoRepository;
 
     @Override
-    public void loadContentFromExcel(MultipartFile file,String providerName) {
+    public void loadContentFromExcel(MultipartFile file, String providerName) {
         log.info("CiosContentServiceImpl::loadJobsFromExcel");
+        String fileName = file.getOriginalFilename();
+        Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
+        String fileId = createFileInfo(null,null, fileName, initiatedOn, null, null);
         try {
             List<Map<String, String>> processedData = processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
             JsonNode jsonData = objectMapper.valueToTree(processedData);
+            jsonData.forEach(node -> {
+                if (node instanceof ObjectNode) {
+                    ((ObjectNode) node).put("lessonSource", fileName);
+                }
+            });
             ContentSource contentSource = ContentSource.fromProviderName(providerName);
             if (contentSource == null) {
                 log.warn("Unknown provider name: " + providerName);
@@ -109,7 +121,16 @@ public class CiosContentServiceImpl implements CiosContentService {
                     upgradBulkSave(upgradContentEntityList);
                     break;
             }
+            Timestamp completedOn = new Timestamp(System.currentTimeMillis());
+            createFileInfo(entity.getId(),fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY);
         }catch (Exception e){
+            ContentSource contentSource = ContentSource.fromProviderName(providerName);
+            if (contentSource == null) {
+                log.warn("Unknown provider name: " + providerName);
+                return;
+            }
+            ContentPartnerEntity entity = getContentDetailsByPartnerName(providerName);
+            createFileInfo(entity.getId(),fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED);
             throw new RuntimeException(e.getMessage());
         }
     }
@@ -290,6 +311,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
 
     }
+
     private List<Map<String, String>> processExcelFile(MultipartFile incomingFile) {
         log.debug("CiosContentServiceImpl::processExcelFile");
         try {
@@ -360,4 +382,44 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
         return dataRows;
     }
+
+    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status) {
+        log.info("CiosContentService:: createFileInfo: creating file information");
+        FileInfoEntity fileInfoEntity = new FileInfoEntity();
+        if (fileId == null) {
+            fileInfoEntity = new FileInfoEntity();
+            fileId = UUID.randomUUID().toString();
+            fileInfoEntity.setFileId(fileId);
+        }
+        fileInfoEntity.setFileId(fileId);
+        fileInfoEntity.setFileName(fileName);
+        fileInfoEntity.setInitiatedOn(initiatedOn);
+        fileInfoEntity.setCompletedOn(completedOn);
+        fileInfoEntity.setStatus(status);
+        fileInfoEntity.setPartnerId(partnerId);
+        fileInfoRepository.save(fileInfoEntity);
+        log.info("created successfully fileInfo{}", fileId);
+        return fileId;
+    }
+
+    @Override
+    public List<FileInfoEntity> getAllFileInfos(String partnerId) {
+        log.info("CiosContentService:: getAllFileInfos: fetching all information about file");
+        try {
+            List<FileInfoEntity> fileInfo = fileInfoRepository.findByPartnerId(partnerId);
+
+            if (fileInfo.isEmpty()) {
+                log.warn("No file information found for partnerId: {}", partnerId);
+            } else {
+                log.info("File information found for partnerId: {}", partnerId);
+            }
+            return fileInfo;
+        } catch (DataAccessException dae) {
+            log.error("Database access error while fetching info", dae.getMessage());
+            throw new CiosContentException(CiosConstants.ERROR, "Database access error: " + dae.getMessage());
+        } catch (Exception e) {
+            throw new CiosContentException(CiosConstants.ERROR, e.getMessage());
+        }
+    }
+
 }
