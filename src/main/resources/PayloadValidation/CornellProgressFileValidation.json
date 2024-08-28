@@ -12,7 +12,12 @@
     },
     "completedon": {
       "type": "string"
-
+    },
+    "providerName": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
     },
 
     "required": [

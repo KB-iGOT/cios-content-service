@@ -19,6 +19,6 @@ public interface CornellContentRepository extends JpaRepository<CornellContentEn
 
     List<CornellContentEntity> findByIsActive(boolean b);
 
-    @Query("SELECT c.ciosData FROM CornellContentEntity c WHERE c.isActive = :isActive")
+    @Query("SELECT c FROM CornellContentEntity c WHERE c.isActive = :isActive")
     Page<Object> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable);
 }

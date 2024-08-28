@@ -18,5 +18,5 @@ public interface CiosContentService {
 
     void loadContentProgressFromExcel(MultipartFile file,String providerName);
 
-    ContentPartnerEntity getContentDetailsByPartnerName(String name);
+    //ContentPartnerEntity getContentDetailsByPartnerName(String name);
 }

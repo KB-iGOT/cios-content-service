@@ -2,9 +2,10 @@
   {
     "operation": "shift",
     "spec": {
-      "StudentId": "userid",
-      "LessonId": "courseid",
-      "CompletionDate": "completedon"
+      "student": "userid",
+      "course": "courseid",
+      "completion_date": "completedon",
+      "status": "status"
     }
   }
 ]
