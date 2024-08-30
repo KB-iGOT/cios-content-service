@@ -12,4 +12,5 @@ public class RequestDto {
     private int size;
     private int page;
     private Boolean isActive;
+    private String keyword;
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.constant.CiosConstants;
 import com.igot.cios.constant.ContentSource;
@@ -22,10 +23,12 @@ import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.repository.UpgradContentRepository;
 import com.igot.cios.service.CiosContentService;
+import com.igot.cios.util.CiosServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
 import com.igot.cios.util.cache.CacheService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,8 +37,11 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -68,6 +74,10 @@ public class CiosContentServiceImpl implements CiosContentService {
     private String progressPathOfTragetFile;
     @Autowired
     private FileInfoRepository fileInfoRepository;
+    @Autowired
+    private RestTemplate restTemplate;
+    @Autowired
+    private CiosServerProperties ciosServerProperties;
 
     @Override
     public void loadContentFromExcel(MultipartFile file, String providerName) {
@@ -102,25 +112,28 @@ public class CiosContentServiceImpl implements CiosContentService {
                     log.info("inside cornell data");
                     jsonData.forEach(eachContentData -> {
                         JsonNode transformData = transformData(eachContentData, contentJson);
-                        payloadValidation.validatePayload(CiosConstants.CORNELL_DATA_PAYLOAD_VALIDATION_FILE, transformData);
+                        ((ObjectNode)transformData.path("content")).put("fileId",fileId).asText();
+                        payloadValidation.validatePayload(CiosConstants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
                         String externalId = transformData.path("content").path("externalId").asText();
                         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-                        CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime);
+                        CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime,fileId);
                         cornellContentEntityList.add(cornellContentEntity);
+
                     });
-                    cornellBulkSave(cornellContentEntityList);
+                    cornellBulkSave(cornellContentEntityList, providerName);
                     break;
                 case UPGRAD:
                     log.info("inside upgrad data");
                     jsonData.forEach(eachContentData -> {
                         JsonNode transformData = transformData(eachContentData, contentJson);
-                        payloadValidation.validatePayload(CiosConstants.CORNELL_DATA_PAYLOAD_VALIDATION_FILE, transformData);
+                        ((ObjectNode)transformData.path("content")).put("fileId",fileId).asText();
+                        payloadValidation.validatePayload(CiosConstants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
                         String externalId = transformData.path("content").path("externalId").asText();
                         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-                        UpgradContentEntity upgradContentEntity = saveOrUpdateUpgradContent(externalId, transformData, eachContentData, currentTime);
+                        UpgradContentEntity upgradContentEntity = saveOrUpdateUpgradContent(externalId, transformData, eachContentData, currentTime,fileId);
                         upgradContentEntityList.add(upgradContentEntity);
                     });
-                    upgradBulkSave(upgradContentEntityList);
+                    upgradBulkSave(upgradContentEntityList, providerName);
                     break;
             }
             Timestamp completedOn = new Timestamp(System.currentTimeMillis());
@@ -137,16 +150,25 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
     }
 
-    private void upgradBulkSave(List<UpgradContentEntity> upgradContentEntityList) {
+    private void upgradBulkSave(List<UpgradContentEntity> upgradContentEntityList,String providerName) {
         upgradContentRepository.saveAll(upgradContentEntityList);
+        Long totalCourseCount= upgradContentRepository.count();
+        JsonNode responseJson = fetchPartnerInfoUsingApi(providerName);
+        ((ObjectNode) responseJson.get(Constants.RESULT)).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
     }
 
-    private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList) {
+    private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList, String providerName) {
         contentRepository.saveAll(cornellContentEntityList);
+        Long totalCourseCount= contentRepository.count();
+        JsonNode responseJson = fetchPartnerInfoUsingApi(providerName);
+        JsonNode data = responseJson.path("result").path("data");
+        ((ObjectNode) data).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
+       // JsonNode resultNode = responseJson.path("result").path("data");
+        updatingPartnerInfo(data, providerName);
     }
 
     @Override
-    public PaginatedResponse<Object> fetchAllContentFromDb(RequestDto dto) {
+    public PaginatedResponse<?> fetchAllContentFromDb(RequestDto dto) {
         log.info("CiosContentServiceImpl::fetchAllCornellContentFromDb");
         Pageable pageable= PageRequest.of(dto.getPage(), dto.getSize());
         ContentSource contentSource = ContentSource.fromProviderName(dto.getProviderName());
@@ -155,13 +177,15 @@ public class CiosContentServiceImpl implements CiosContentService {
             return null;
         }
         try {
-            Page<Object> pageData = null;
+            Page<?> pageData = null;
             switch (contentSource) {
                 case CORNELL:
-                    pageData= contentRepository.findAllCiosDataAndIsActive(dto.getIsActive(),pageable);
+                    Page<CornellContentEntity>  cornellPageData= contentRepository.findAllCiosDataAndIsActive(dto.getIsActive(),pageable,dto.getKeyword());
+                    pageData = cornellPageData;
                     break;
                 case UPGRAD:
-                    pageData= upgradContentRepository.findAllCiosDataAndIsActive(dto.getIsActive(),pageable);
+                    Page<UpgradContentEntity> upgradPageData= upgradContentRepository.findAllCiosDataAndIsActive(dto.getIsActive(),pageable,dto.getKeyword());
+                    pageData = upgradPageData;
                     break;
             }
             return new PaginatedResponse<>(
@@ -224,7 +248,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
     }
 
-    private UpgradContentEntity saveOrUpdateUpgradContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime) {
+    private UpgradContentEntity saveOrUpdateUpgradContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime, String fileId) {
         Optional<UpgradContentEntity> optExternalContent = upgradContentRepository.findByExternalId(externalId);
         if (optExternalContent.isPresent()) {
             UpgradContentEntity externalContent = optExternalContent.get();
@@ -234,6 +258,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             externalContent.setCreatedDate(externalContent.getCreatedDate());
             externalContent.setUpdatedDate(currentTime);
             externalContent.setSourceData(rawContentData);
+            externalContent.setFileId(fileId);
             return externalContent;
         } else {
             UpgradContentEntity externalContent = new UpgradContentEntity();
@@ -247,7 +272,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
     }
 
-    private CornellContentEntity saveOrUpdateCornellContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime) {
+    private CornellContentEntity saveOrUpdateCornellContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime,String fileId) {
         Optional<CornellContentEntity> optExternalContent = contentRepository.findByExternalId(externalId);
         if (optExternalContent.isPresent()) {
             CornellContentEntity externalContent = optExternalContent.get();
@@ -257,6 +282,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             externalContent.setCreatedDate(externalContent.getCreatedDate());
             externalContent.setUpdatedDate(currentTime);
             externalContent.setSourceData(rawContentData);
+            externalContent.setFileId(fileId);
             return externalContent;
         } else {
             CornellContentEntity externalContent = new CornellContentEntity();
@@ -266,6 +292,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             externalContent.setCreatedDate(currentTime);
             externalContent.setUpdatedDate(currentTime);
             externalContent.setSourceData(rawContentData);
+            externalContent.setFileId(fileId);
             return externalContent;
         }
 
@@ -278,7 +305,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             List<Object> contentJson = objectMapper.convertValue(entity.getTransformProgressJson(), new TypeReference<List<Object>>() {
             });
             JsonNode transformData = transformData(rawContentData, contentJson);
-            payloadValidation.validatePayload(CiosConstants.CORNELL_PROGRESS_DATA_VALIDATION_FILE, transformData);
+            payloadValidation.validatePayload(CiosConstants.PROGRESS_DATA_VALIDATION_FILE, transformData);
             kafkaProducer.push(topic, transformData);
             log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {
@@ -421,6 +448,141 @@ public class CiosContentServiceImpl implements CiosContentService {
         } catch (Exception e) {
             throw new CiosContentException(CiosConstants.ERROR, e.getMessage());
         }
+    }
+
+    private JsonNode fetchPartnerInfoUsingApi(String partnerName) {
+        log.info("fetching partner data by external API");
+        String getApiUrl = ciosServerProperties.getPartnerServiceUrl() + ciosServerProperties.getPartnerReadEndPoint() + partnerName;
+        Map<String, String> headers = new HashMap<>();
+        //headers.put("Authorization", "Bearer " + ciosServerProperties.getSbApiKey());
+        Map<String, Object> readData = (Map<String, Object>) fetchResultUsingGet(getApiUrl, headers);
+
+        if (readData == null) {
+            throw new RuntimeException("Failed to get data from API: Response is null");
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.convertValue(readData, JsonNode.class);
+    }
+
+    public Object fetchResultUsingGet(String uri, Map<String, String> headersValues) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        Map<String, Object> response = null;
+        try {
+            if (log.isDebugEnabled()) {
+                StringBuilder str = new StringBuilder(this.getClass().getCanonicalName())
+                        .append(Constants.FETCH_RESULT_CONSTANT).append(System.lineSeparator());
+                str.append(Constants.URI_CONSTANT).append(uri).append(System.lineSeparator());
+                log.debug(str.toString());
+            }
+            HttpHeaders headers = new HttpHeaders();
+            if (!CollectionUtils.isEmpty(headersValues)) {
+                headersValues.forEach((k, v) -> headers.set(k, v));
+            }
+            HttpEntity<Object> entity = new HttpEntity<>(headers);
+            response = restTemplate.exchange(uri, HttpMethod.GET, entity, Map.class).getBody();
+        } catch (HttpClientErrorException e) {
+            try {
+                response = (new ObjectMapper()).readValue(e.getResponseBodyAsString(),
+                        new TypeReference<HashMap<String, Object>>() {
+                        });
+            } catch (Exception e1) {
+            }
+            log.error("Error received: " + e.getResponseBodyAsString(), e);
+        } catch (Exception e) {
+            log.error(String.valueOf(e));
+            try {
+                log.warn("Error Response: " + mapper.writeValueAsString(response));
+            } catch (Exception e1) {
+            }
+        }
+        return response;
+    }
+
+    public String updatingPartnerInfo(JsonNode postData, String partnerName) {
+        String responseStatus = "";
+        try {
+            log.info("callPostApi started for partnerName: {}", partnerName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Object> postDataMap = objectMapper.convertValue(postData, new TypeReference<Map<String, Object>>() {});
+
+            // Prepare the request payload
+            Map<String, Object> request = new HashMap<>();
+            request.putAll(postDataMap);
+            log.info("Prepared request payload: {}", request);
+
+            // Prepare the headers
+            Map<String, String> headers = new HashMap<>();
+            //headers.put("Authorization", "Bearer " + ciosServerProperties.getSbApiKey());
+
+            // Construct the URL for the POST API
+            StringBuilder strUrl = new StringBuilder(ciosServerProperties.getPartnerServiceUrl());
+            strUrl.append(ciosServerProperties.getPartnerCreateEndPoint());
+            log.info("Constructed POST API URL: {}", strUrl);
+
+            // Make the POST API call using the outbound request handler
+            Map<String, Object> postApiResponse = (Map<String, Object>)
+                    fetchResultUsingPost(strUrl.toString(), request, headers);
+
+            // Process the API response
+            if (MapUtils.isNotEmpty(postApiResponse) && Constants.OK.equalsIgnoreCase(
+                    (String) postApiResponse.get(Constants.RESPONSE_CODE))) {
+                Map<String, Object> result = (Map<String, Object>) postApiResponse.get(Constants.RESULT);
+                responseStatus = (String) result.getOrDefault(Constants.STATUS, "UNKNOWN");
+                log.info("POST API call succeeded with status: {}", responseStatus);
+            } else {
+                log.error("Failed to execute POST API: {}",
+                        postApiResponse.get(Constants.RESPONSE_CODE));
+            }
+
+        } catch (Exception e) {
+            log.error("Unexpected error occurred in callPostApi for partnerName: {}", partnerName, e);
+        }
+
+        return responseStatus;
+    }
+
+
+    public Map<String, Object> fetchResultUsingPost(String uri, Object request, Map<String, String> headersValues) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        Map<String, Object> response = null;
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            if (!CollectionUtils.isEmpty(headersValues)) {
+                headersValues.forEach((k, v) -> headers.set(k, v));
+            }
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Object> entity = new HttpEntity<>(request, headers);
+            if (log.isDebugEnabled()) {
+                StringBuilder str = new StringBuilder(this.getClass().getCanonicalName()).append(".fetchResult")
+                        .append(System.lineSeparator());
+                str.append("URI: ").append(uri).append(System.lineSeparator());
+                str.append("Request: ").append(mapper.writeValueAsString(request)).append(System.lineSeparator());
+                log.debug(str.toString());
+            }
+            response = restTemplate.postForObject(uri, entity, Map.class);
+            if (log.isDebugEnabled()) {
+                StringBuilder str = new StringBuilder("Response: ");
+                str.append(mapper.writeValueAsString(response)).append(System.lineSeparator());
+                log.debug(str.toString());
+            }
+        } catch (HttpClientErrorException hce) {
+            try {
+                response = (new ObjectMapper()).readValue(hce.getResponseBodyAsString(),
+                        new TypeReference<HashMap<String, Object>>() {
+                        });
+            } catch (Exception e1) {
+            }
+            log.error("Error received: " + hce.getResponseBodyAsString(), hce);
+        } catch(JsonProcessingException e) {
+            log.error(String.valueOf(e));
+            try {
+                log.warn("Error Response: " + mapper.writeValueAsString(response));
+            } catch (Exception e1) {
+            }
+        }
+        return response;
     }
 
 }

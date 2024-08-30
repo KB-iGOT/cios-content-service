@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -19,6 +20,9 @@ public interface CornellContentRepository extends JpaRepository<CornellContentEn
 
     List<CornellContentEntity> findByIsActive(boolean b);
 
-    @Query("SELECT c FROM CornellContentEntity c WHERE c.isActive = :isActive")
-    Page<Object> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable);
+    @Query(value = "SELECT * FROM public.cornell_content_entity c " +
+            "WHERE c.is_active = :isActive " +
+            "AND LOWER(c.cios_data->'content'->>'name') ILIKE LOWER(CONCAT('%', :keyword, '%'))",
+            nativeQuery = true)
+    Page<CornellContentEntity> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable, @Param("keyword") String keyword);
 }

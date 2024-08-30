@@ -6,4 +6,11 @@ public class Constants {
     public static final String CONTENT_UPLOAD_SUCCESSFULLY= "success";
     public static final String CONTENT_UPLOAD_FAILED= "failed";
     public static final String SOURCE= "source";
+    public static final String FETCH_RESULT_CONSTANT = ".fetchResult:";
+    public static final String URI_CONSTANT = "URI: ";
+    public static final String RESULT = "result";
+    public static final String TOTAL_COURSE_COUNT = "totalCourseCount";
+    public static final String RESPONSE_CODE = "responseCode";
+    public static final String OK = "OK";
+    public static final String STATUS = "status";
 }

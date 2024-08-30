@@ -17,6 +17,9 @@ public interface UpgradContentRepository extends JpaRepository<UpgradContentEnti
     Optional<UpgradContentEntity> findByExternalId(String externalId);
 
     List<UpgradContentEntity> findByIsActive(boolean b);
-    @Query("SELECT c.ciosData FROM UpgradContentEntity c WHERE c.isActive = :isActive")
-    Page<Object> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable);
+    @Query(value = "SELECT c.cios_data FROM upgrad_content_entity c " +
+            "WHERE c.is_active = :isActive " +
+            "AND LOWER(c.cios_data->'content'->>'name') ILIKE LOWER(CONCAT('%', :keyword, '%'))",
+            nativeQuery = true)
+    Page<UpgradContentEntity> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable, @Param("keyword") String keyword);
 }
