@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
 
 @RestController
@@ -20,12 +21,12 @@ public class CiosContentController {
     CiosContentService ciosContentService;
 
     @PostMapping(value = "/v1/loadContentFromExcel/{partnerName}", consumes = "multipart/form-data")
-    public ResponseEntity<String> loadContentFromExcel(
+    public ResponseEntity<Object> loadContentFromExcel(
             @RequestParam(value = "file") MultipartFile file,
             @PathVariable("partnerName") String partnerName) {
         try {
             ciosContentService.loadContentFromExcel(file, partnerName);
-            return ResponseEntity.ok("Loading of content from excel is successful.");
+            return ResponseEntity.status(HttpStatus.OK).body(new HashMap<>()); // returns an empty JSON body
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error during loading of content from excel: " + e.getMessage());
