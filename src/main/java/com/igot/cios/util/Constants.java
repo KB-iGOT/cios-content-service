@@ -13,4 +13,9 @@ public class Constants {
     public static final String RESPONSE_CODE = "responseCode";
     public static final String OK = "OK";
     public static final String STATUS = "status";
+    public static final String DATA = "data";
+    public static final String UPDATED_ON = "updatedOn";
+    public static final String CREATED_ON = "createdOn";
+    public static final String CONTENT_UPLOAD_LAST_UPDATED_DATE = "contentUploadLastUpdatedDate";
+    public static final String CONTENT_PROGRESS_LAST_UPDATED_DATE = "contentProgressLastUpdatedDate";
 }

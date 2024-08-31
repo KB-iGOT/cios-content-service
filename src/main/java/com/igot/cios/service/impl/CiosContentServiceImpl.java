@@ -154,17 +154,40 @@ public class CiosContentServiceImpl implements CiosContentService {
         upgradContentRepository.saveAll(upgradContentEntityList);
         Long totalCourseCount= upgradContentRepository.count();
         JsonNode responseJson = fetchPartnerInfoUsingApi(providerName);
-        ((ObjectNode) responseJson.get(Constants.RESULT)).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
+        JsonNode resultData = responseJson.path(Constants.RESULT);
+        JsonNode data = resultData.path(Constants.DATA);
+        ((ObjectNode) data).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
+        ((ObjectNode) resultData).remove(Constants.DATA);
+        ((ObjectNode) resultData).setAll((ObjectNode) (data));
+        ((ObjectNode) resultData).remove(Constants.UPDATED_ON);
+        ((ObjectNode) resultData).remove(Constants.CREATED_ON);
+        if (resultData.path(Constants.CONTENT_UPLOAD_LAST_UPDATED_DATE).isNull()) {
+            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
+        }
+        if (resultData.path(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE).isNull()) {
+            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
+        }
+        updatingPartnerInfo(resultData, providerName);
     }
 
     private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList, String providerName) {
         contentRepository.saveAll(cornellContentEntityList);
-        Long totalCourseCount= contentRepository.count();
+        Long totalCourseCount = contentRepository.count();
         JsonNode responseJson = fetchPartnerInfoUsingApi(providerName);
-        JsonNode data = responseJson.path("result").path("data");
+        JsonNode resultData = responseJson.path(Constants.RESULT);
+        JsonNode data = resultData.path(Constants.DATA);
         ((ObjectNode) data).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
-       // JsonNode resultNode = responseJson.path("result").path("data");
-        updatingPartnerInfo(data, providerName);
+        ((ObjectNode) resultData).remove(Constants.DATA);
+        ((ObjectNode) resultData).setAll((ObjectNode) (data));
+        ((ObjectNode) resultData).remove(Constants.UPDATED_ON);
+        ((ObjectNode) resultData).remove(Constants.CREATED_ON);
+        if (resultData.path(Constants.CONTENT_UPLOAD_LAST_UPDATED_DATE).isNull()) {
+            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
+        }
+        if (resultData.path(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE).isNull()) {
+            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
+        }
+        updatingPartnerInfo(resultData, providerName);
     }
 
     @Override
@@ -451,7 +474,7 @@ public class CiosContentServiceImpl implements CiosContentService {
     }
 
     private JsonNode fetchPartnerInfoUsingApi(String partnerName) {
-        log.info("fetching partner data by external API");
+        log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerName");
         String getApiUrl = ciosServerProperties.getPartnerServiceUrl() + ciosServerProperties.getPartnerReadEndPoint() + partnerName;
         Map<String, String> headers = new HashMap<>();
         //headers.put("Authorization", "Bearer " + ciosServerProperties.getSbApiKey());
@@ -465,6 +488,7 @@ public class CiosContentServiceImpl implements CiosContentService {
     }
 
     public Object fetchResultUsingGet(String uri, Map<String, String> headersValues) {
+        log.info("CiosContentServiceImpl::fetchResultUsingGet:fetching partner data by get API call");
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         Map<String, Object> response = null;
@@ -500,31 +524,25 @@ public class CiosContentServiceImpl implements CiosContentService {
     }
 
     public String updatingPartnerInfo(JsonNode postData, String partnerName) {
+        log.info("CiosContentServiceImpl::updatingPartnerInfo:updating partner data");
         String responseStatus = "";
         try {
             log.info("callPostApi started for partnerName: {}", partnerName);
             ObjectMapper objectMapper = new ObjectMapper();
-            Map<String, Object> postDataMap = objectMapper.convertValue(postData, new TypeReference<Map<String, Object>>() {});
-
-            // Prepare the request payload
+            Map<String, Object> postDataMap = objectMapper.convertValue(postData, new TypeReference<Map<String, Object>>() {
+            });
             Map<String, Object> request = new HashMap<>();
             request.putAll(postDataMap);
             log.info("Prepared request payload: {}", request);
-
-            // Prepare the headers
             Map<String, String> headers = new HashMap<>();
-            //headers.put("Authorization", "Bearer " + ciosServerProperties.getSbApiKey());
 
-            // Construct the URL for the POST API
             StringBuilder strUrl = new StringBuilder(ciosServerProperties.getPartnerServiceUrl());
             strUrl.append(ciosServerProperties.getPartnerCreateEndPoint());
             log.info("Constructed POST API URL: {}", strUrl);
 
-            // Make the POST API call using the outbound request handler
             Map<String, Object> postApiResponse = (Map<String, Object>)
                     fetchResultUsingPost(strUrl.toString(), request, headers);
 
-            // Process the API response
             if (MapUtils.isNotEmpty(postApiResponse) && Constants.OK.equalsIgnoreCase(
                     (String) postApiResponse.get(Constants.RESPONSE_CODE))) {
                 Map<String, Object> result = (Map<String, Object>) postApiResponse.get(Constants.RESULT);
@@ -534,7 +552,6 @@ public class CiosContentServiceImpl implements CiosContentService {
                 log.error("Failed to execute POST API: {}",
                         postApiResponse.get(Constants.RESPONSE_CODE));
             }
-
         } catch (Exception e) {
             log.error("Unexpected error occurred in callPostApi for partnerName: {}", partnerName, e);
         }
@@ -544,6 +561,7 @@ public class CiosContentServiceImpl implements CiosContentService {
 
 
     public Map<String, Object> fetchResultUsingPost(String uri, Object request, Map<String, String> headersValues) {
+        log.info("CiosContentServiceImpl::fetchResultUsingPost:updating partner data by get API call");
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         Map<String, Object> response = null;
@@ -575,7 +593,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             } catch (Exception e1) {
             }
             log.error("Error received: " + hce.getResponseBodyAsString(), hce);
-        } catch(JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             log.error(String.valueOf(e));
             try {
                 log.warn("Error Response: " + mapper.writeValueAsString(response));
