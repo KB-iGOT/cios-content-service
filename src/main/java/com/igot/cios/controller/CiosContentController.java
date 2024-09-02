@@ -65,7 +65,7 @@ public class CiosContentController {
         return ResponseEntity.ok(fileInfos);
     }
 
-    @PostMapping("/deleteContent")
+    @PostMapping("/v1/deleteContent")
     public ResponseEntity<?> deleteNotPublishContent(@RequestBody DeleteContentRequestDto deleteContentRequestDto) {
         try {
             return ciosContentService.deleteNotPublishContent(deleteContentRequestDto);
