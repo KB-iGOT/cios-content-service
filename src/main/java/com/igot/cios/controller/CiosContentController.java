@@ -1,10 +1,13 @@
 package com.igot.cios.controller;
 
+import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.RequestDto;
 import com.igot.cios.entity.FileInfoEntity;
+import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.service.CiosContentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -62,4 +65,14 @@ public class CiosContentController {
         return ResponseEntity.ok(fileInfos);
     }
 
+    @DeleteMapping("/deleteContent")
+    public ResponseEntity<?> deleteNotPublishContent(@RequestBody DeleteContentRequestDto deleteContentRequestDto) {
+        try {
+            return ciosContentService.deleteNotPublishContent(deleteContentRequestDto);
+        } catch (CiosContentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (DataAccessException dae) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Database access error: " + dae.getMessage());
+        }
+    }
 }

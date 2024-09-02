@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.constant.CiosConstants;
 import com.igot.cios.constant.ContentSource;
+import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
 import com.igot.cios.entity.ContentPartnerEntity;
@@ -601,6 +602,99 @@ public class CiosContentServiceImpl implements CiosContentService {
             }
         }
         return response;
+    }
+
+    @Override
+    public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
+        log.info("CiosContentServiceImpl:: deleteNotPublishContent: deleting non-published content");
+        String partnerName = deleteContentRequestDto.getPartnerName();
+        List<String> externalIds = deleteContentRequestDto.getExternalId();
+        ContentSource contentSource = ContentSource.fromProviderName(partnerName);
+        if (contentSource == null) {
+            log.warn("Unknown partner name: " + partnerName);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid partner name.");
+        }
+        try {
+            List<?> allContent = fetchAllContentByPartnerName(contentSource);
+            boolean hasValidationErrors = false;
+            StringBuilder validationErrors = new StringBuilder();
+            List<Object> validContentToDelete = new ArrayList<>();
+            for (String externalId : externalIds) {
+                Optional<?> contentEntityOpt = allContent.stream()
+                        .filter(content -> getExternalId(content).equals(externalId))
+                        .findFirst();
+                if (contentEntityOpt.isPresent()) {
+                    Object contentEntity = contentEntityOpt.get();
+                    boolean isActive = getIsActiveStatus(contentEntity);
+                    if (isActive) {
+                        validationErrors.append("External ID: ").append(externalId)
+                                .append(" is live, we can't delete live content.\n");
+                        hasValidationErrors = true;
+                    } else {
+                        validContentToDelete.add(contentEntity);
+                    }
+                } else {
+                    validationErrors.append("External ID: ").append(externalId)
+                            .append(" does not exist.\n");
+                    hasValidationErrors = true;
+                }
+            }
+            if (hasValidationErrors) {
+                log.error("No valid content found for deletion.");
+                validationErrors.append("No valid content found for deletion.");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(validationErrors.toString());
+            }
+            for (Object content : validContentToDelete) {
+                deleteContent(content);
+            }
+            return ResponseEntity.ok("Content deleted successfully.");
+        } catch (DataAccessException dae) {
+            log.error("Database access error while deleting content", dae.getMessage());
+            throw new CiosContentException(CiosConstants.ERROR, "Database access error: " + dae.getMessage());
+        } catch (Exception e) {
+            log.error("Error occurred while deleting content", e.getMessage());
+            throw new CiosContentException(CiosConstants.ERROR, e.getMessage());
+        }
+    }
+
+
+    private List<?> fetchAllContentByPartnerName(ContentSource contentSource) {
+        switch (contentSource) {
+            case CORNELL:
+                return contentRepository.findAll();
+            case UPGRAD:
+                return upgradContentRepository.findAll();
+            // Add more cases if needed
+            default:
+                return Collections.emptyList();
+        }
+    }
+
+    private String getExternalId(Object contentEntity) {
+        if (contentEntity instanceof CornellContentEntity) {
+            return ((CornellContentEntity) contentEntity).getExternalId();
+        } else if (contentEntity instanceof UpgradContentEntity) {
+            return ((UpgradContentEntity) contentEntity).getExternalId();
+        }
+        return null;
+    }
+
+    private boolean getIsActiveStatus(Object contentEntity) {
+        if (contentEntity instanceof CornellContentEntity) {
+            return ((CornellContentEntity) contentEntity).getIsActive();
+        } else if (contentEntity instanceof UpgradContentEntity) {
+            return ((UpgradContentEntity) contentEntity).getIsActive();
+        }
+        return false;
+    }
+
+    private void deleteContent(Object contentEntity) {
+        if (contentEntity instanceof CornellContentEntity) {
+            contentRepository.delete((CornellContentEntity) contentEntity);
+        } else if (contentEntity instanceof UpgradContentEntity) {
+            upgradContentRepository.delete((UpgradContentEntity) contentEntity);
+        }
+        // Add more cases if needed
     }
 
 }
