@@ -38,7 +38,7 @@ public class CiosContentController {
     @PostMapping(value = "/v1/readAllContentFromDb")
     public ResponseEntity<?> fetchContentFromDb(@RequestBody RequestDto dto) {
         try {
-            return ResponseEntity.ok(ciosContentService.fetchAllContentFromDb(dto));
+            return ResponseEntity.ok(ciosContentService.fetchAllContentFromSecondaryDb(dto));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error during fetching of content from db: " + e.getMessage());
