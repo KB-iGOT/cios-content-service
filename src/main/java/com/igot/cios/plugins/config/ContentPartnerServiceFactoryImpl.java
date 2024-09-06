@@ -1,6 +1,6 @@
 package com.igot.cios.plugins.config;
 
-import com.igot.cios.constant.ContentSource;
+import com.igot.cios.plugins.ContentSource;
 import com.igot.cios.plugins.ContentPartnerPluginService;
 import com.igot.cios.plugins.cornell.CornellPluginServiceImpl;
 import com.igot.cios.plugins.upgrad.UpgradPluginServiceImpl;

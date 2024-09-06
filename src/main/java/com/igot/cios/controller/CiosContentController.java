@@ -22,10 +22,10 @@ public class CiosContentController {
     @Autowired
     CiosContentService ciosContentService;
 
-    @PostMapping(value = "/v1/loadContentFromExcel/{partnerName}", consumes = "multipart/form-data")
+    @PostMapping(value = "/v1/loadContentFromExcel/{orgid}", consumes = "multipart/form-data")
     public ResponseEntity<Object> loadContentFromExcel(
             @RequestParam(value = "file") MultipartFile file,
-            @PathVariable("partnerName") String partnerName) {
+            @PathVariable("orgid") String partnerName) {
         try {
             ciosContentService.loadContentFromExcel(file, partnerName);
             return ResponseEntity.status(HttpStatus.OK).body(new HashMap<>());

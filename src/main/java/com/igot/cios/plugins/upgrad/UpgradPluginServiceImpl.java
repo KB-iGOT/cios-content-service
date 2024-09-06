@@ -2,9 +2,7 @@ package com.igot.cios.plugins.upgrad;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.igot.cios.constant.CiosConstants;
 import com.igot.cios.dto.RequestDto;
-import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.UpgradContentEntity;
 import com.igot.cios.plugins.ContentPartnerPluginService;
 import com.igot.cios.plugins.DataTransformUtility;
@@ -15,9 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,24 +28,24 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
     UpgradContentRepository upgradContentRepository;
 
     @Override
-    public void loadContentFromExcel(JsonNode processedData, String providerName, String fileName, String fileId, List<Object> contentJson) {
+    public void loadContentFromExcel(JsonNode processedData, String orgId, String fileName, String fileId, List<Object> contentJson) {
         List<UpgradContentEntity> upgradContentEntityList = new ArrayList<>();
         processedData.forEach(eachContentData -> {
             JsonNode transformData = dataTransformUtility.transformData(eachContentData, contentJson);
             ((ObjectNode) transformData.path("content")).put("fileId", fileId).asText();
-            dataTransformUtility.validatePayload(CiosConstants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
+            dataTransformUtility.validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
             String externalId = transformData.path("content").path("externalId").asText();
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             UpgradContentEntity upgradContentEntity = saveOrUpdateUpgradContent(externalId, transformData, eachContentData, currentTime, fileId);
             upgradContentEntityList.add(upgradContentEntity);
         });
-        upgradBulkSave(upgradContentEntityList, providerName);
+        upgradBulkSave(upgradContentEntityList, orgId);
     }
 
-    private void upgradBulkSave(List<UpgradContentEntity> upgradContentEntityList, String providerName) {
+    private void upgradBulkSave(List<UpgradContentEntity> upgradContentEntityList, String orgId) {
         upgradContentRepository.saveAll(upgradContentEntityList);
         Long totalCourseCount = upgradContentRepository.count();
-        JsonNode responseJson = dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
+        JsonNode responseJson = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
         JsonNode resultData = responseJson.path(Constants.RESULT);
         JsonNode data = resultData.path(Constants.DATA);
         ((ObjectNode) data).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
@@ -63,7 +59,7 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
         if (resultData.path(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE).isNull()) {
             ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
         }
-        dataTransformUtility.updatingPartnerInfo(resultData, providerName);
+        dataTransformUtility.updatingPartnerInfo(resultData, orgId);
     }
 
     private UpgradContentEntity saveOrUpdateUpgradContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime, String fileId) {

@@ -7,7 +7,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.igot.cios.constant.CiosConstants;
 import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.repository.FileInfoRepository;
@@ -99,20 +98,6 @@ public class DataTransformUtility {
         return dataRows;
     }
 
-//    public JsonNode transformData(Object sourceObject, String destinationPath) {
-//        log.info("CiosContentServiceImpl::transformData");
-//        String inputJson;
-//        try {
-//            inputJson = objectMapper.writeValueAsString(sourceObject);
-//        } catch (JsonProcessingException e) {
-//            return null;
-//        }
-//        List<Object> specJson = JsonUtils.classpathToList(destinationPath);
-//        Chainr chainr = Chainr.fromSpec(specJson);
-//        Object transformedOutput = chainr.transform(JsonUtils.jsonToObject(inputJson));
-//        return objectMapper.convertValue(transformedOutput, JsonNode.class);
-//    }
-
     public JsonNode transformData(Object sourceObject, List<Object> specJson) {
         log.debug("CiosContentServiceImpl::transformData");
         try {
@@ -125,14 +110,6 @@ public class DataTransformUtility {
             return null;
         }
 
-    }
-
-    public JsonNode loadAndTransformFromExcel(MultipartFile file) {
-        log.info("CiosContentServiceImpl::loadJobsFromExcel");
-        List<Map<String, String>> processedData = processExcelFile(file);
-        log.info("No.of processedData from excel: " + processedData.size());
-        JsonNode jsonData = objectMapper.valueToTree(processedData);
-        return jsonData;
     }
 
     public List<Map<String, String>> processExcelFile(MultipartFile incomingFile) {
@@ -240,7 +217,6 @@ public class DataTransformUtility {
         log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerName");
         String getApiUrl = cbServerProperties.getPartnerServiceUrl() + cbServerProperties.getPartnerReadEndPoint() + partnerName;
         Map<String, String> headers = new HashMap<>();
-        //headers.put("Authorization", "Bearer " + ciosServerProperties.getSbApiKey());
         Map<String, Object> readData = (Map<String, Object>) fetchResultUsingGet(getApiUrl, headers);
 
         if (readData == null) {

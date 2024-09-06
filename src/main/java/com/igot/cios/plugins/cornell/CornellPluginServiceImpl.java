@@ -2,10 +2,8 @@ package com.igot.cios.plugins.cornell;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.igot.cios.constant.CiosConstants;
 import com.igot.cios.dto.RequestDto;
 import com.igot.cios.entity.CornellContentEntity;
-import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.ContentPartnerPluginService;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.CornellContentRepository;
@@ -13,7 +11,6 @@ import com.igot.cios.util.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -38,20 +35,20 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
     private String pathOfTragetFile;
 
     @Override
-    public void loadContentFromExcel(JsonNode processedData, String providerName,String fileName,String fileId,List<Object> contentJson){
+    public void loadContentFromExcel(JsonNode processedData, String orgId,String fileName,String fileId,List<Object> contentJson){
         List<CornellContentEntity> cornellContentEntityList = new ArrayList<>();
         processedData.forEach(eachContentData -> {
             JsonNode transformData = dataTransformUtility.transformData(eachContentData, contentJson);
             ((ObjectNode)transformData.path("content")).put("fileId",fileId).asText();
             ((ObjectNode)transformData.path("content")).put("source",fileName).asText();
-            dataTransformUtility.validatePayload(CiosConstants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
+            dataTransformUtility.validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
             String externalId = transformData.path("content").path("externalId").asText();
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime,fileId);
             cornellContentEntityList.add(cornellContentEntity);
 
         });
-        cornellBulkSave(cornellContentEntityList, providerName);
+        cornellBulkSave(cornellContentEntityList, orgId);
     }
     private CornellContentEntity saveOrUpdateCornellContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime,String fileId) {
         Optional<CornellContentEntity> optExternalContent = cornellContentRepository.findByExternalId(externalId);
@@ -78,10 +75,10 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
         }
 
     }
-    private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList, String providerName) {
+    private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList, String orgId) {
         cornellContentRepository.saveAll(cornellContentEntityList);
         Long totalCourseCount = cornellContentRepository.count();
-        JsonNode responseJson = dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
+        JsonNode responseJson = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
         JsonNode resultData = responseJson.path(Constants.RESULT);
         JsonNode data = resultData.path(Constants.DATA);
         ((ObjectNode) data).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
@@ -95,7 +92,7 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
         if (resultData.path(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE).isNull()) {
             ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
         }
-        dataTransformUtility.updatingPartnerInfo(resultData, providerName);
+        dataTransformUtility.updatingPartnerInfo(resultData, orgId);
     }
 
     @Override

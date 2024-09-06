@@ -70,7 +70,7 @@ public class CourseSchedulerService {
                 String formatedDate = updateDateFormatFromTimestamp(date);
                 ((ObjectNode) transformData).put("completedon", formatedDate);
                 ((ObjectNode) transformData).put("providerName", providerName);
-                payloadValidation.validatePayload(Constants.CORNELL_PROGRESS_DATA_VALIDATION_FILE, transformData);
+                payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
                 kafkaProducer.push(cbServerProperties.getTopic(), transformData);
             }else{
                 log.info("Progress updated 100 for user {}",userId);

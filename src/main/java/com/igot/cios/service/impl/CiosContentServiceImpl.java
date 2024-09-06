@@ -3,8 +3,7 @@ package com.igot.cios.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.igot.cios.constant.CiosConstants;
-import com.igot.cios.constant.ContentSource;
+import com.igot.cios.plugins.ContentSource;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
@@ -16,30 +15,20 @@ import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.ContentPartnerPluginService;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.plugins.config.ContentPartnerServiceFactory;
-import com.igot.cios.repository.ContentPartnerRepository;
 import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.service.CiosContentService;
-import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
-import com.igot.cios.util.cache.CacheService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 
@@ -63,37 +52,38 @@ public class CiosContentServiceImpl implements CiosContentService {
     private FileInfoRepository fileInfoRepository;
 
     @Override
-    public void loadContentFromExcel(MultipartFile file, String providerName) {
+    public void loadContentFromExcel(MultipartFile file, String orgId) {
         log.info("CiosContentServiceImpl::loadJobsFromExcel");
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
         String fileId = dataTransformUtility.createFileInfo(null, null, fileName, initiatedOn, null, null);
         try {
+            ContentSource contentSource = ContentSource.fromOrgId(orgId);
+            if (contentSource == null) {
+                log.warn("Unknown provider name: " + orgId);
+                return;
+            }
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
             JsonNode jsonData = objectMapper.valueToTree(processedData);
-            ContentSource contentSource = ContentSource.fromProviderName(providerName);
-            if (contentSource == null) {
-                log.warn("Unknown provider name: " + providerName);
-                return;
-            }
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
+
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
             List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("trasformContentJson"), new TypeReference<List<Object>>() {
             });
             if (contentJson == null || contentJson.isEmpty()) {
                 throw new CiosContentException("Transformation data not present in content partner db", HttpStatus.INTERNAL_SERVER_ERROR);
             }
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
-            service.loadContentFromExcel(jsonData, providerName, fileName, fileId, contentJson);
+            service.loadContentFromExcel(jsonData, orgId, fileName, fileId, contentJson);
             Timestamp completedOn = new Timestamp(System.currentTimeMillis());
             dataTransformUtility.createFileInfo(entity.path("result").get("id").asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY);
         } catch (Exception e) {
-            ContentSource contentSource = ContentSource.fromProviderName(providerName);
+            ContentSource contentSource = ContentSource.fromOrgId(orgId);
             if (contentSource == null) {
-                log.warn("Unknown provider name: " + providerName);
+                log.warn("Unknown provider name: " + orgId);
                 return;
             }
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
             dataTransformUtility.createFileInfo(entity.get("id").asText(), fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED);
             throw new RuntimeException(e.getMessage());
         }
@@ -102,27 +92,38 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public PaginatedResponse<?> fetchAllContentFromSecondaryDb(RequestDto dto) {
         log.info("CiosContentServiceImpl::fetchAllCornellContentFromDb");
-        ContentSource contentSource = ContentSource.fromProviderName(dto.getProviderName());
+        ContentSource contentSource = ContentSource.fromOrgId(dto.getOrgId());
         if (contentSource == null) {
-            log.warn("Unknown provider name: " + dto.getProviderName());
+            log.warn("Unknown provider name: " + dto.getOrgId());
             return null;
         }
         try {
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
             Page<?> pageData = service.fetchAllContentFromSecondaryDb(dto);
-            return new PaginatedResponse<>(
-                    pageData.getContent(),
-                    pageData.getTotalPages(),
-                    pageData.getTotalElements(),
-                    pageData.getNumberOfElements(),
-                    pageData.getSize(),
-                    pageData.getNumber()
-            );
+            if(pageData!=null) {
+                return new PaginatedResponse<>(
+                        pageData.getContent(),
+                        pageData.getTotalPages(),
+                        pageData.getTotalElements(),
+                        pageData.getNumberOfElements(),
+                        pageData.getSize(),
+                        pageData.getNumber()
+                );
+            }else{
+                return new PaginatedResponse<>(
+                        Collections.emptyList(),
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                );
+            }
         } catch (DataAccessException dae) {
             log.error("Database access error while fetching content", dae.getMessage());
-            throw new CiosContentException(CiosConstants.ERROR, "Database access error: " + dae.getMessage());
+            throw new CiosContentException(Constants.ERROR, "Database access error: " + dae.getMessage());
         } catch (Exception e) {
-            throw new CiosContentException(CiosConstants.ERROR, e.getMessage());
+            throw new CiosContentException(Constants.ERROR, e.getMessage());
         }
 
     }
@@ -148,7 +149,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
             List<Object> contentJson = Collections.singletonList(entity.path("transformProgressJson").asText());
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
-            payloadValidation.validatePayload(CiosConstants.PROGRESS_DATA_VALIDATION_FILE, transformData);
+            payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
             kafkaProducer.push(topic, transformData);
             log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {
@@ -171,19 +172,19 @@ public class CiosContentServiceImpl implements CiosContentService {
             return fileInfo;
         } catch (DataAccessException dae) {
             log.error("Database access error while fetching info", dae.getMessage());
-            throw new CiosContentException(CiosConstants.ERROR, "Database access error: " + dae.getMessage());
+            throw new CiosContentException(Constants.ERROR, "Database access error: " + dae.getMessage());
         } catch (Exception e) {
-            throw new CiosContentException(CiosConstants.ERROR, e.getMessage());
+            throw new CiosContentException(Constants.ERROR, e.getMessage());
         }
     }
 
     @Override
     public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
         log.info("CiosContentServiceImpl:: deleteNotPublishContent: deleting non-published content");
-        String partnerName = deleteContentRequestDto.getPartnerName();
-        ContentSource contentSource = ContentSource.fromProviderName(partnerName);
+        String orgId = deleteContentRequestDto.getOrgId();
+        ContentSource contentSource = ContentSource.fromOrgId(orgId);
         if (contentSource == null) {
-            log.warn("Unknown provider name: " + partnerName);
+            log.warn("Unknown provider name: " + orgId);
             return null;
         }
         List<String> externalIds = deleteContentRequestDto.getExternalId();
@@ -225,14 +226,12 @@ public class CiosContentServiceImpl implements CiosContentService {
             return ResponseEntity.ok("Content deleted successfully.");
         } catch (DataAccessException dae) {
             log.error("Database access error while deleting content", dae.getMessage());
-            throw new CiosContentException(CiosConstants.ERROR, "Database access error: " + dae.getMessage());
+            throw new CiosContentException(Constants.ERROR, "Database access error: " + dae.getMessage());
         } catch (Exception e) {
             log.error("Error occurred while deleting content", e.getMessage());
-            throw new CiosContentException(CiosConstants.ERROR, e.getMessage());
+            throw new CiosContentException(Constants.ERROR, e.getMessage());
         }
     }
-
-
 
 
     private String getExternalId(Object contentEntity) {

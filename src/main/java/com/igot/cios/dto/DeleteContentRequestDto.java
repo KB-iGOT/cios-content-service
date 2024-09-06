@@ -14,5 +14,5 @@ import java.util.List;
 public class DeleteContentRequestDto {
 
     private List<String> externalId;
-    private String partnerName;
+    private String orgId;
 }

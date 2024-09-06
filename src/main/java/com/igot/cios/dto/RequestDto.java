@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class RequestDto {
-    private String providerName;
+    private String orgId;
     private int size;
     private int page;
     private Boolean isActive;
