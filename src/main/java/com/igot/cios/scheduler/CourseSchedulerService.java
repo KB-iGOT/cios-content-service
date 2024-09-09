@@ -47,10 +47,10 @@ public class CourseSchedulerService {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    private void callCornellEnrollmentAPI(String providerName, JsonNode rawContentData) {
+    private void callCornellEnrollmentAPI(String orgId, JsonNode rawContentData) {
         try {
             log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
-            JsonNode entity=dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
+            JsonNode entity=dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
             List<Object> contentJson= Collections.singletonList(entity.path("result").get("transformProgressJson").toString());
             JsonNode transformData = dataTransformUtility.transformData(rawContentData,contentJson);
             String extCourseId = transformData.get("courseid").asText();
@@ -69,7 +69,7 @@ public class CourseSchedulerService {
                 Long date = Long.valueOf(transformData.get("completedon").asText());
                 String formatedDate = updateDateFormatFromTimestamp(date);
                 ((ObjectNode) transformData).put("completedon", formatedDate);
-                ((ObjectNode) transformData).put("providerName", providerName);
+                ((ObjectNode) transformData).put("orgId", orgId);
                 payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
                 kafkaProducer.push(cbServerProperties.getTopic(), transformData);
             }else{
