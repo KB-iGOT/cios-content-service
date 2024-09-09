@@ -3,6 +3,7 @@ package com.igot.cios.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.plugins.ContentSource;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
@@ -129,27 +130,29 @@ public class CiosContentServiceImpl implements CiosContentService {
     }
 
     @Override
-    public void loadContentProgressFromExcel(MultipartFile file, String providerName) {
+    public void loadContentProgressFromExcel(MultipartFile file, String orgId) {
         try {
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
             JsonNode jsonData = objectMapper.valueToTree(processedData);
             jsonData.forEach(
                     eachContentData -> {
-                        callEnrollmentAPI(eachContentData, providerName);
+                        callEnrollmentAPI(eachContentData, orgId);
                     });
         } catch (Exception e) {
             throw new CiosContentException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    private void callEnrollmentAPI(JsonNode rawContentData, String providerName) {
+    private void callEnrollmentAPI(JsonNode rawContentData, String orgId) {
         try {
             log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
-            List<Object> contentJson = Collections.singletonList(entity.path("transformProgressJson").asText());
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
+            List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("transformProgressJson"), new TypeReference<List<Object>>() {
+            });
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
+            ((ObjectNode)transformData).put("orgId",orgId);
             kafkaProducer.push(topic, transformData);
             log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {

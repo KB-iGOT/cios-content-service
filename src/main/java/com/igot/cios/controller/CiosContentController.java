@@ -25,9 +25,9 @@ public class CiosContentController {
     @PostMapping(value = "/v1/loadContentFromExcel/{orgid}", consumes = "multipart/form-data")
     public ResponseEntity<Object> loadContentFromExcel(
             @RequestParam(value = "file") MultipartFile file,
-            @PathVariable("orgid") String partnerName) {
+            @PathVariable("orgid") String orgId) {
         try {
-            ciosContentService.loadContentFromExcel(file, partnerName);
+            ciosContentService.loadContentFromExcel(file, orgId);
             return ResponseEntity.status(HttpStatus.OK).body(new HashMap<>());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -45,10 +45,10 @@ public class CiosContentController {
         }
     }
 
-    @PostMapping(value = "/v1/loadContentProgressFromExcel", consumes = "multipart/form-data")
-    public ResponseEntity<Object> loadContentProgressFromExcel(@RequestParam(value = "file") MultipartFile file, @RequestParam(value = "partnerName") String providerName) {
+    @PostMapping(value = "/v1/loadContentProgressFromExcel/{orgid}", consumes = "multipart/form-data")
+    public ResponseEntity<Object> loadContentProgressFromExcel(@RequestParam(value = "file") MultipartFile file, @PathVariable("orgid") String orgId) {
         try {
-            ciosContentService.loadContentProgressFromExcel(file, providerName);
+            ciosContentService.loadContentProgressFromExcel(file, orgId);
             return ResponseEntity.status(HttpStatus.OK).body(new HashMap<>());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

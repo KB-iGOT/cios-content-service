@@ -12,5 +12,5 @@ import java.util.Map;
 public class RequestBodyDTO {
     private String serviceCode;
     private Map<String, String> urlMap;
-    private String secureVendorName;
+    private String vendorOrgId;
 }

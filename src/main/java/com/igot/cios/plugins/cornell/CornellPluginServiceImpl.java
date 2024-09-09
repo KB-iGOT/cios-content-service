@@ -86,12 +86,8 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
         ((ObjectNode) resultData).setAll((ObjectNode) (data));
         ((ObjectNode) resultData).remove(Constants.UPDATED_ON);
         ((ObjectNode) resultData).remove(Constants.CREATED_ON);
-        if (resultData.path(Constants.CONTENT_UPLOAD_LAST_UPDATED_DATE).isNull()) {
-            ((ObjectNode) resultData).put(Constants.CONTENT_UPLOAD_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
-        }
-        if (resultData.path(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE).isNull()) {
-            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
-        }
+        ((ObjectNode) resultData).put(Constants.CONTENT_UPLOAD_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
+        ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
         dataTransformUtility.updatingPartnerInfo(resultData, orgId);
     }
 

@@ -51,7 +51,7 @@ public class CourseSchedulerService {
         try {
             log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
             JsonNode entity=dataTransformUtility.fetchPartnerInfoUsingApi(providerName);
-            List<Object> contentJson= Collections.singletonList(entity.path("transformProgressJson").asText());
+            List<Object> contentJson= Collections.singletonList(entity.path("result").get("transformProgressJson").toString());
             JsonNode transformData = dataTransformUtility.transformData(rawContentData,contentJson);
             String extCourseId = transformData.get("courseid").asText();
             JsonNode result = callCiosReadApi(extCourseId);
@@ -130,7 +130,7 @@ public class CourseSchedulerService {
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
         requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
-        requestBodyDTO.setSecureVendorName("eCornell");
+        requestBodyDTO.setVendorOrgId("G00345");
         String requestBody = objectMapper.writeValueAsString(requestBodyDTO);
         return performEnrollmentCall("eCornell", requestBody);
     }
