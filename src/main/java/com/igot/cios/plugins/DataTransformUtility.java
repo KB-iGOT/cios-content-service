@@ -213,9 +213,9 @@ public class DataTransformUtility {
         return response;
     }
 
-    public JsonNode fetchPartnerInfoUsingApi(String partnerName) {
+    public JsonNode fetchPartnerInfoUsingApi(String orgId) {
         log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerName");
-        String getApiUrl = cbServerProperties.getPartnerServiceUrl() + cbServerProperties.getPartnerReadEndPoint() + partnerName;
+        String getApiUrl = cbServerProperties.getPartnerServiceUrl() + cbServerProperties.getPartnerReadEndPoint() + orgId;
         Map<String, String> headers = new HashMap<>();
         Map<String, Object> readData = (Map<String, Object>) fetchResultUsingGet(getApiUrl, headers);
 
