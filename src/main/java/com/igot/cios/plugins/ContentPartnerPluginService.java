@@ -10,8 +10,8 @@ import java.util.List;
 
 @Service
 public interface ContentPartnerPluginService {
-    void loadContentFromExcel(JsonNode processedData, String orgId,String fileName,String fileId,List<Object> contentJson) throws IOException;
+    void loadContentFromExcel(JsonNode processedData, String partnerCode,String fileName,String fileId,List<Object> contentJson) throws IOException;
     Page<?> fetchAllContentFromSecondaryDb(RequestDto dto);
-    List<?> fetchAllContentByPartnerName();
+    List<?> fetchAllContent();
     void deleteContent(Object contentEntity);
 }

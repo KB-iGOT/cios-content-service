@@ -5,14 +5,14 @@ public enum ContentSource {
     UPGRAD;
 
 
-    public static ContentSource fromOrgId(String orgId) {
-        switch (orgId) {
-            case "G00345":
+    public static ContentSource fromPartnerCode(String partnerCode) {
+        switch (partnerCode) {
+            case "CORNELL":
                 return CORNELL;
-            case "1234":
+            case "UPGRADE":
                 return UPGRAD;
             default:
-                throw new RuntimeException("Unknown provider org id: " + orgId);
+                throw new RuntimeException("Unknown partner code: " + partnerCode);
         }
     }
 }

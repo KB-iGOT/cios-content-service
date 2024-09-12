@@ -213,9 +213,9 @@ public class DataTransformUtility {
         return response;
     }
 
-    public JsonNode fetchPartnerInfoUsingApi(String orgId) {
-        log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerName");
-        String getApiUrl = cbServerProperties.getPartnerServiceUrl() + cbServerProperties.getPartnerReadEndPoint() + orgId;
+    public JsonNode fetchPartnerInfoUsingApi(String partnerCode) {
+        log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerCode");
+        String getApiUrl = cbServerProperties.getPartnerServiceUrl() + cbServerProperties.getPartnerReadEndPoint() + partnerCode;
         Map<String, String> headers = new HashMap<>();
         Map<String, Object> readData = (Map<String, Object>) fetchResultUsingGet(getApiUrl, headers);
 
@@ -307,7 +307,7 @@ public class DataTransformUtility {
         fileInfoEntity.setStatus(status);
         fileInfoEntity.setPartnerId(partnerId);
         fileInfoRepository.save(fileInfoEntity);
-        log.info("created successfully fileInfo{}", fileId);
+        log.info("created successfully fileInfo {}", fileId);
         return fileId;
     }
 

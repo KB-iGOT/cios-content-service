@@ -93,7 +93,7 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
     }
 
     @Override
-    public List<?> fetchAllContentByPartnerName() {
+    public List<?> fetchAllContent() {
         return upgradContentRepository.findAll();
     }
 

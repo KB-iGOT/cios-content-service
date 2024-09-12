@@ -10,7 +10,6 @@ import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.util.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,9 +29,6 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
 
     @Autowired
     DataTransformUtility dataTransformUtility;
-
-    @Value("${transformation.source-to-target.spec.path}")
-    private String pathOfTragetFile;
 
     @Override
     public void loadContentFromExcel(JsonNode processedData, String orgId,String fileName,String fileId,List<Object> contentJson){
@@ -98,7 +94,7 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
     }
 
     @Override
-    public List<?> fetchAllContentByPartnerName() {
+    public List<?> fetchAllContent() {
         return cornellContentRepository.findAll();
     }
 

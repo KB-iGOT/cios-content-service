@@ -53,38 +53,33 @@ public class CiosContentServiceImpl implements CiosContentService {
     private FileInfoRepository fileInfoRepository;
 
     @Override
-    public void loadContentFromExcel(MultipartFile file, String orgId) {
-        log.info("CiosContentServiceImpl::loadJobsFromExcel");
+    public void loadContentFromExcel(MultipartFile file, String partnerCode) {
+        log.info("CiosContentServiceImpl::loadContentFromExcel");
+        ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
+        if (contentSource == null) {
+            log.warn("Unknown provider name: " + partnerCode);
+            return;
+        }
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
         String fileId = dataTransformUtility.createFileInfo(null, null, fileName, initiatedOn, null, null);
         try {
-            ContentSource contentSource = ContentSource.fromOrgId(orgId);
-            if (contentSource == null) {
-                log.warn("Unknown provider name: " + orgId);
-                return;
-            }
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
             JsonNode jsonData = objectMapper.valueToTree(processedData);
 
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("trasformContentJson"), new TypeReference<List<Object>>() {
             });
             if (contentJson == null || contentJson.isEmpty()) {
                 throw new CiosContentException("Transformation data not present in content partner db", HttpStatus.INTERNAL_SERVER_ERROR);
             }
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
-            service.loadContentFromExcel(jsonData, orgId, fileName, fileId, contentJson);
+            service.loadContentFromExcel(jsonData, partnerCode, fileName, fileId, contentJson);
             Timestamp completedOn = new Timestamp(System.currentTimeMillis());
             dataTransformUtility.createFileInfo(entity.path("result").get("id").asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY);
         } catch (Exception e) {
-            ContentSource contentSource = ContentSource.fromOrgId(orgId);
-            if (contentSource == null) {
-                log.warn("Unknown provider name: " + orgId);
-                return;
-            }
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             dataTransformUtility.createFileInfo(entity.get("id").asText(), fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED);
             throw new RuntimeException(e.getMessage());
         }
@@ -93,9 +88,9 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public PaginatedResponse<?> fetchAllContentFromSecondaryDb(RequestDto dto) {
         log.info("CiosContentServiceImpl::fetchAllCornellContentFromDb");
-        ContentSource contentSource = ContentSource.fromOrgId(dto.getOrgId());
+        ContentSource contentSource = ContentSource.fromPartnerCode(dto.getPartnerCode());
         if (contentSource == null) {
-            log.warn("Unknown provider name: " + dto.getOrgId());
+            log.warn("Unknown provider name: " + dto.getPartnerCode());
             return null;
         }
         try {
@@ -184,16 +179,16 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
         log.info("CiosContentServiceImpl:: deleteNotPublishContent: deleting non-published content");
-        String orgId = deleteContentRequestDto.getOrgId();
-        ContentSource contentSource = ContentSource.fromOrgId(orgId);
+        String partnerCode = deleteContentRequestDto.getPartnerCode();
+        ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
-            log.warn("Unknown provider name: " + orgId);
+            log.warn("Unknown provider name: " + partnerCode);
             return null;
         }
         List<String> externalIds = deleteContentRequestDto.getExternalId();
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
         try {
-            List<?> allContent = service.fetchAllContentByPartnerName();
+            List<?> allContent = service.fetchAllContent();
             boolean hasValidationErrors = false;
             StringBuilder validationErrors = new StringBuilder();
             List<Object> validContentToDelete = new ArrayList<>();
