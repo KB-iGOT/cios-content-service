@@ -75,4 +75,10 @@ public class CiosContentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Database access error: " + dae.getMessage());
         }
     }
+
+    @GetMapping("/v1/read/content/{partnercode}/{externalid}")
+    public ResponseEntity<?> readContentByExternalId(@PathVariable String partnercode,@PathVariable String externalid) {
+        Object response = ciosContentService.readContentByExternalId(partnercode,externalid);
+        return ResponseEntity.ok(response);
+    }
 }

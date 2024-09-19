@@ -22,4 +22,6 @@ public interface CiosContentService {
     List<FileInfoEntity> getAllFileInfos(String partnerId);
 
     ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto);
+
+    Object readContentByExternalId(String partnercode, String externalid);
 }

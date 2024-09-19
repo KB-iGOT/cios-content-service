@@ -14,4 +14,6 @@ public interface ContentPartnerPluginService {
     Page<?> fetchAllContentFromSecondaryDb(RequestDto dto);
     List<?> fetchAllContent();
     void deleteContent(Object contentEntity);
+
+    Object readContentByExternalId(String externalid);
 }

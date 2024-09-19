@@ -231,6 +231,17 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
     }
 
+    @Override
+    public Object readContentByExternalId(String partnercode, String externalid) {
+        ContentSource contentSource = ContentSource.fromPartnerCode(partnercode);
+        if (contentSource == null) {
+            log.warn("Unknown provider name: " + partnercode);
+            return null;
+        }
+        ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
+        return service.readContentByExternalId(externalid);
+    }
+
 
     private String getExternalId(Object contentEntity) {
         if (contentEntity instanceof CornellContentEntity) {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.RequestDto;
 import com.igot.cios.entity.CornellContentEntity;
+import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.ContentPartnerPluginService;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.CornellContentRepository;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -101,6 +103,17 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
     @Override
     public void deleteContent(Object contentEntity) {
         cornellContentRepository.delete((CornellContentEntity) contentEntity);
+    }
+
+    @Override
+    public Object readContentByExternalId(String externalid) {
+        Optional<CornellContentEntity> entity = cornellContentRepository.findByExternalId(externalid);
+        if(entity.isPresent()){
+            return entity.get().getCiosData();
+        }else{
+            throw new CiosContentException("No data found for given id",externalid, HttpStatus.BAD_REQUEST);
+        }
+
     }
 
 }
