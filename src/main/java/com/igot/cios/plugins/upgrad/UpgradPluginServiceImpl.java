@@ -51,18 +51,12 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
         JsonNode responseJson = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
         JsonNode resultData = responseJson.path(Constants.RESULT);
         JsonNode data = resultData.path(Constants.DATA);
-        ((ObjectNode) data).put(Constants.TOTAL_COURSE_COUNT, totalCourseCount);
+        ((ObjectNode) data).put(Constants.TOTAL_COURSES_COUNT, totalCourseCount);
         ((ObjectNode) resultData).remove(Constants.DATA);
         ((ObjectNode) resultData).setAll((ObjectNode) (data));
         ((ObjectNode) resultData).remove(Constants.UPDATED_ON);
         ((ObjectNode) resultData).remove(Constants.CREATED_ON);
-        if (resultData.path(Constants.CONTENT_UPLOAD_LAST_UPDATED_DATE).isNull()) {
-            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
-        }
-        if (resultData.path(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE).isNull()) {
-            ((ObjectNode) resultData).put(Constants.CONTENT_PROGRESS_LAST_UPDATED_DATE, "0000-01-01T00:00:00Z");
-        }
-        dataTransformUtility.updatingPartnerInfo(resultData, orgId);
+        dataTransformUtility.updatingPartnerInfo(resultData);
     }
 
     private UpgradContentEntity saveOrUpdateUpgradContent(String externalId, JsonNode transformData, JsonNode rawContentData, Timestamp currentTime, String fileId) {
@@ -113,5 +107,11 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
         }else{
             throw new CiosContentException("No data found for given id",externalid, HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @Override
+    public Object updateContent(JsonNode jsonNode,String partnerCode) {
+
+        return null;
     }
 }

@@ -1,9 +1,13 @@
 package com.igot.cios.service.impl;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.plugins.ContentSource;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
@@ -20,17 +24,22 @@ import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.service.CiosContentService;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
+import com.igot.cios.util.elasticsearch.dto.SearchCriteria;
+import com.igot.cios.util.elasticsearch.dto.SearchResult;
+import com.igot.cios.util.elasticsearch.service.EsUtilService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 @Service
@@ -51,6 +60,12 @@ public class CiosContentServiceImpl implements CiosContentService {
     private ContentPartnerServiceFactory contentPartnerServiceFactory;
     @Autowired
     private FileInfoRepository fileInfoRepository;
+    @Autowired
+    EsUtilService esUtilService;
+    @Value("${search.result.redis.ttl}")
+    private long searchResultRedisTtl;
+    @Autowired
+    private RedisTemplate<String, SearchResult> redisTemplate;
 
     @Override
     public void loadContentFromExcel(MultipartFile file, String partnerCode) {
@@ -179,11 +194,15 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
         log.info("CiosContentServiceImpl:: deleteNotPublishContent: deleting non-published content");
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
         String partnerCode = deleteContentRequestDto.getPartnerCode();
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnerCode);
-            return null;
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErr("Invalid partner name.");
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
         List<String> externalIds = deleteContentRequestDto.getExternalId();
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
@@ -213,21 +232,26 @@ public class CiosContentServiceImpl implements CiosContentService {
                 }
             }
             if (hasValidationErrors) {
-                log.error("No valid content found for deletion.");
-                validationErrors.append("No valid content found for deletion.");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(validationErrors.toString());
+                log.error("Validation errors: {}", validationErrors.toString());
+                response.getParams().setStatus(Constants.FAILED);
+                response.getParams().setErr(validationErrors.toString());
+                response.setResponseCode(HttpStatus.BAD_REQUEST);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
 
             for (Object content : validContentToDelete) {
                 service.deleteContent(content);
             }
-            return ResponseEntity.ok("Content deleted successfully.");
-        } catch (DataAccessException dae) {
-            log.error("Database access error while deleting content", dae.getMessage());
-            throw new CiosContentException(Constants.ERROR, "Database access error: " + dae.getMessage());
-        } catch (Exception e) {
-            log.error("Error occurred while deleting content", e.getMessage());
-            throw new CiosContentException(Constants.ERROR, e.getMessage());
+            response.getResult().put(Constants.STATUS, Constants.SUCCESS);
+            response.getResult().put(Constants.MESSAGE, "Content deleted successfully.");
+            response.setResponseCode(HttpStatus.OK);
+            return ResponseEntity.ok(response);
+        }catch (Exception e) {
+            log.error("Error occurred while deleting content: {}", e.getMessage());
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErr("Error occurred while deleting content: " + e.getMessage());
+            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -259,5 +283,47 @@ public class CiosContentServiceImpl implements CiosContentService {
             return ((UpgradContentEntity) contentEntity).getIsActive();
         }
         return false;
+    }
+
+
+    @Override
+    public SearchResult searchContent(SearchCriteria searchCriteria) {
+        log.info("CiosContentServiceImpl::searchCotent");
+        try {
+            SearchResult searchResult = esUtilService.searchDocuments(Constants.CIOS_CONTENT_INDEX_NAME, searchCriteria);
+            redisTemplate.opsForValue()
+                    .set(generateRedisJwtTokenKey(searchCriteria), searchResult, searchResultRedisTtl,
+                            TimeUnit.SECONDS);
+            return searchResult;
+        } catch (Exception e) {
+            throw new CiosContentException("ERROR", e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Override
+    public Object updateContent(JsonNode jsonNode) {
+        log.info("CiosContentServiceImpl::updateContent");
+        String partnerCode=jsonNode.path("content").get("partnerCode").asText();
+        ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
+        if (contentSource == null) {
+            log.warn("Unknown provider name: " + partnerCode);
+            return null;
+        }
+        ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
+        return service.updateContent(jsonNode,partnerCode);
+    }
+
+    private String generateRedisJwtTokenKey(Object requestPayload) {
+        if (requestPayload != null) {
+            try {
+                String reqJsonString = objectMapper.writeValueAsString(requestPayload);
+                return JWT.create()
+                        .withClaim(Constants.REQUEST_PAYLOAD, reqJsonString)
+                        .sign(Algorithm.HMAC256(Constants.JWT_SECRET_KEY));
+            } catch (JsonProcessingException e) {
+                log.error("Error occurred while converting json object to json string", e);
+            }
+        }
+        return "";
     }
 }

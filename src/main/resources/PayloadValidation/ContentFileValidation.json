@@ -48,6 +48,42 @@
         },
         "source": {
           "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "fileId": {
+          "type": "string"
+        },
+        "partnerCode": {
+          "type": "string"
+        },
+        "searchTags": {
+          "type": "keyword"
+        },
+        "competencies_v5": {
+          "type": "keyword"
+        },
+        "contentPartner": {
+          "type": "text"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "publishedOn": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "contentSearchTags": {
+          "type": "keyword"
         }
       },
       "required": [
@@ -57,8 +93,11 @@
         "redirectUrl",
         "appIcon",
         "externalId",
-        "objectives"
-      ]
+        "objectives",
+        "source",
+        "status"
+      ],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

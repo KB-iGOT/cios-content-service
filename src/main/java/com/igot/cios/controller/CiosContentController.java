@@ -1,10 +1,13 @@
 package com.igot.cios.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.RequestDto;
 import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.service.CiosContentService;
+import com.igot.cios.util.elasticsearch.dto.SearchCriteria;
+import com.igot.cios.util.elasticsearch.dto.SearchResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
@@ -80,5 +83,17 @@ public class CiosContentController {
     public ResponseEntity<?> readContentByExternalId(@PathVariable String partnercode,@PathVariable String externalid) {
         Object response = ciosContentService.readContentByExternalId(partnercode,externalid);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/v1/search/content")
+    public ResponseEntity<?> searchContent(@RequestBody SearchCriteria searchCriteria) {
+        SearchResult searchResult = ciosContentService.searchContent(searchCriteria);
+        return new ResponseEntity<>(searchResult, HttpStatus.OK);
+    }
+
+    @PostMapping("/v1/update/content")
+    public ResponseEntity<?> updateContent(@RequestBody JsonNode jsonNode) {
+        Object searchResult = ciosContentService.updateContent(jsonNode);
+        return new ResponseEntity<>(searchResult, HttpStatus.OK);
     }
 }

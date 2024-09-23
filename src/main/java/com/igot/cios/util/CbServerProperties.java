@@ -49,4 +49,7 @@ public class CbServerProperties {
 
     @Value("${partner.create.update.path}")
     private String partnerCreateEndPoint;
+
+    @Value("${elastic.required.field.cios.content.json.path}")
+    private String elasticCiosContentJsonPath;
 }

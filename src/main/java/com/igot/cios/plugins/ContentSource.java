@@ -1,18 +1,23 @@
 package com.igot.cios.plugins;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum ContentSource {
-    CORNELL,
-    UPGRAD;
+    CORNELL("${cornell.partner.code}"),
+    UPGRAD("${upgrad.partner.code}");
 
+    private String value;
 
-    public static ContentSource fromPartnerCode(String partnerCode) {
-        switch (partnerCode) {
-            case "CORNELL":
-                return CORNELL;
-            case "UPGRADE":
-                return UPGRAD;
-            default:
-                throw new RuntimeException("Unknown partner code: " + partnerCode);
+    ContentSource(String value) {
+        this.value = value;
+    }
+
+    public static ContentSource fromPartnerCode(String text) {
+        for (ContentSource b : ContentSource.values()) {
+            if (String.valueOf(b).equals(text)) {
+                return b;
+            }
         }
+        return null;
     }
 }

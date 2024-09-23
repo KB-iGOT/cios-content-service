@@ -16,7 +16,10 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
+import static javax.xml.bind.DatatypeConverter.parseDate;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -26,8 +29,10 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -98,6 +103,51 @@ public class DataTransformUtility {
         return dataRows;
     }
 
+    private List<Map<String, String>> processCsvAndSendMessage(InputStream inputStream) throws IOException {
+        log.info("DesignationServiceImpl::processCsvAndSendMessage");
+        List<Map<String, String>> dataRows = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader())) {
+            List<String> headers = csvParser.getHeaderNames();
+            for (CSVRecord csvRecord : csvParser) {
+                boolean allBlank = true;
+                Map<String, String> rowData = new HashMap<>();
+                for (String header : headers) {
+                    String cellValue = csvRecord.get(header);
+                    if (cellValue != null && !cellValue.trim().isEmpty()) {
+                        // Handle date format (assuming date is in a specific format)
+                        if (isDate(cellValue)) {
+                            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+                            cellValue = dateFormat.format(parseDate(cellValue));
+                        } else {
+                            cellValue = cellValue.replace("\n", ",").trim();
+                        }
+                        allBlank = false;
+                    }
+                    rowData.put(header, cellValue);
+                }
+                if (allBlank) {
+                    break;
+                }
+                dataRows.add(rowData);
+            }
+            log.info("Number of Data Rows Processed: " + dataRows.size());
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            throw new RuntimeException(e.getMessage());
+        }
+        return dataRows;
+    }
+
+    private boolean isDate(String value) {
+        try {
+            parseDate(value);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public JsonNode transformData(Object sourceObject, List<Object> specJson) {
         log.debug("CiosContentServiceImpl::transformData");
         try {
@@ -124,94 +174,45 @@ public class DataTransformUtility {
 
     private List<Map<String, String>> validateFileAndProcessRows(MultipartFile file) {
         log.info("CiosContentServiceImpl::validateFileAndProcessRows");
-        try (InputStream inputStream = file.getInputStream();
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            return processSheetAndSendMessage(sheet);
+        String fileName = file.getOriginalFilename();
+        if (fileName == null) {
+            throw new RuntimeException("File name is null");
+        }
+        try (InputStream inputStream = file.getInputStream()){
+            if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+                Workbook workbook = WorkbookFactory.create(inputStream);
+                Sheet sheet = workbook.getSheetAt(0);
+                return processSheetAndSendMessage(sheet);
+            }else if (fileName.endsWith(".csv")) {
+                return processCsvAndSendMessage(inputStream);
+            }else {
+                throw new RuntimeException("Unsupported file type: " + fileName);
+            }
         } catch (IOException e) {
             log.error("Error while processing Excel file: {}", e.getMessage());
             throw new RuntimeException(e.getMessage());
         }
     }
 
-    public String updatingPartnerInfo(JsonNode postData, String partnerName) {
+    public String updatingPartnerInfo(JsonNode jsonNode) {
         log.info("CiosContentServiceImpl::updatingPartnerInfo:updating partner data");
-        String responseStatus = "";
-        try {
-            log.info("callPostApi started for partnerName: {}", partnerName);
-            ObjectMapper objectMapper = new ObjectMapper();
-            Map<String, Object> postDataMap = objectMapper.convertValue(postData, new TypeReference<Map<String, Object>>() {
-            });
-            Map<String, Object> request = new HashMap<>();
-            request.putAll(postDataMap);
-            log.info("Prepared request payload: {}", request);
-            Map<String, String> headers = new HashMap<>();
+        String url=cbServerProperties.getCbPoresbaseUrl()+cbServerProperties.getPartnerCreateEndPoint();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-            StringBuilder strUrl = new StringBuilder(cbServerProperties.getPartnerServiceUrl());
-            strUrl.append(cbServerProperties.getPartnerCreateEndPoint());
-            log.info("Constructed POST API URL: {}", strUrl);
+        // Create the request entity with body and headers
+        HttpEntity<Object> entity = new HttpEntity<>(jsonNode, headers);
 
-            Map<String, Object> postApiResponse = (Map<String, Object>)
-                    fetchResultUsingPost(strUrl.toString(), request, headers);
-
-            if (MapUtils.isNotEmpty(postApiResponse) && Constants.OK.equalsIgnoreCase(
-                    (String) postApiResponse.get(Constants.RESPONSE_CODE))) {
-                Map<String, Object> result = (Map<String, Object>) postApiResponse.get(Constants.RESULT);
-                responseStatus = (String) result.getOrDefault(Constants.STATUS, "UNKNOWN");
-                log.info("POST API call succeeded with status: {}", responseStatus);
-            } else {
-                log.error("Failed to execute POST API: {}",
-                        postApiResponse.get(Constants.RESPONSE_CODE));
-            }
-        } catch (Exception e) {
-            log.error("Unexpected error occurred in callPostApi for partnerName: {}", partnerName, e);
+        // Make the POST request
+        ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+        if(response.getStatusCode().is2xxSuccessful()){
+            return response.getBody();
+        }else{
+            throw new CiosContentException("Error from update content partner api",HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        return responseStatus;
     }
 
-    public Map<String, Object> fetchResultUsingPost(String uri, Object request, Map<String, String> headersValues) {
-        log.info("CiosContentServiceImpl::fetchResultUsingPost:updating partner data by get API call");
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-        Map<String, Object> response = null;
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            if (!CollectionUtils.isEmpty(headersValues)) {
-                headersValues.forEach((k, v) -> headers.set(k, v));
-            }
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Object> entity = new HttpEntity<>(request, headers);
-            if (log.isDebugEnabled()) {
-                StringBuilder str = new StringBuilder(this.getClass().getCanonicalName()).append(".fetchResult")
-                        .append(System.lineSeparator());
-                str.append("URI: ").append(uri).append(System.lineSeparator());
-                str.append("Request: ").append(mapper.writeValueAsString(request)).append(System.lineSeparator());
-                log.debug(str.toString());
-            }
-            response = restTemplate.postForObject(uri, entity, Map.class);
-            if (log.isDebugEnabled()) {
-                StringBuilder str = new StringBuilder("Response: ");
-                str.append(mapper.writeValueAsString(response)).append(System.lineSeparator());
-                log.debug(str.toString());
-            }
-        } catch (HttpClientErrorException hce) {
-            try {
-                response = (new ObjectMapper()).readValue(hce.getResponseBodyAsString(),
-                        new TypeReference<HashMap<String, Object>>() {
-                        });
-            } catch (Exception e1) {
-            }
-            log.error("Error received: " + hce.getResponseBodyAsString(), hce);
-        } catch (JsonProcessingException e) {
-            log.error(String.valueOf(e));
-            try {
-                log.warn("Error Response: " + mapper.writeValueAsString(response));
-            } catch (Exception e1) {
-            }
-        }
-        return response;
-    }
+
 
     public JsonNode fetchPartnerInfoUsingApi(String partnerCode) {
         log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerCode");

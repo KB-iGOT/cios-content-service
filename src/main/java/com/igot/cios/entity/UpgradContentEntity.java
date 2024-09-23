@@ -35,5 +35,6 @@ public class UpgradContentEntity implements Serializable {
     @Type(type = "jsonb")
     @Column(columnDefinition = "jsonb")
     private JsonNode sourceData;
-    private String fileId;
+    private String publishedOn;
+    private  String fileId;
 }

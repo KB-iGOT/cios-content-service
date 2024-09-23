@@ -1,0 +1,68 @@
+{
+  "externalId": {
+    "type": "keyword"
+  },
+  "appIcon": {
+    "type": "text"
+  },
+  "redirectUrl": {
+    "type": "text"
+  },
+  "name": {
+    "type": "text"
+  },
+  "topic": {
+    "type": "text"
+  },
+  "duration": {
+    "type": "integer"
+  },
+  "objectives": {
+    "type": "text"
+  },
+  "description": {
+    "type": "text"
+  },
+  "fileId": {
+    "type": "keyword"
+  },
+  "source": {
+    "type": "text"
+  },
+  "isActive": {
+    "type": "boolean"
+  },
+  "createdDate": {
+    "type": "date",
+    "format": "epoch_millis"
+  },
+  "updatedDate": {
+    "type": "date",
+    "format": "epoch_millis"
+  },
+  "publishedOn": {
+    "type": "date",
+    "format": "yyyy-MM-dd HH:mm:ss.SSS"
+  },
+  "partnerCode": {
+    "type": "keyword"
+  },
+  "status": {
+    "type": "keyword"
+  },
+  "searchTags": {
+    "type": "keyword"
+  },
+  "competencies_v5": {
+    "type": "keyword"
+  },
+  "contentPartner": {
+    "type": "text"
+  },
+  "contentId": {
+    "type": "keyword"
+  },
+  "contentSearchTags": {
+    "type": "keyword"
+  }
+}
