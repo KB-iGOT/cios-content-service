@@ -74,7 +74,7 @@ public class EsUtilServiceImpl implements EsUtilService {
                 }
             }
             IndexRequest indexRequest =
-                    new IndexRequest(esIndexName, type, id).source(document, XContentType.JSON);
+                    new IndexRequest(esIndexName, type, id).source(document, XContentType.JSON).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
             IndexResponse response = elasticsearchClient.index(indexRequest, RequestOptions.DEFAULT);
             log.info("EsUtilServiceImpl :: addDocument :Insertion response {}", response.status());
             return response.status();

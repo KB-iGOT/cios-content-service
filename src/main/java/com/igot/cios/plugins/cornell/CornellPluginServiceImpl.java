@@ -58,7 +58,7 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
             ((ObjectNode)transformData.path("content")).put(Constants.CREATED_DATE,currentTime.toString()).asText();
             ((ObjectNode)transformData.path("content")).put(Constants.UPDATED_DATE,currentTime.toString()).asText();
             ((ObjectNode)transformData.path("content")).put(Constants.ACTIVE,Constants.ACTIVE_STATUS).asText();
-            ((ObjectNode)transformData.path("content")).put(Constants.PUBLISHED_ON,0).asText();
+            ((ObjectNode)transformData.path("content")).put(Constants.PUBLISHED_ON,"0000-00-00 00:00:00").asText();
             //dataTransformUtility.validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
             addSearchTags(transformData);
             String externalId = transformData.path("content").path("externalId").asText();
@@ -184,7 +184,7 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
             Map<String, Object> entityMap = objectMapper.convertValue(externalContent, Map.class);
             flattenContentData(entityMap);
             String uniqueId = partnerCode + "_" + externalContent.getExternalId();
-            esUtilService.addDocument(Constants.CIOS_CONTENT_INDEX_NAME, Constants.INDEX_TYPE,
+            esUtilService.updateDocument(Constants.CIOS_CONTENT_INDEX_NAME, Constants.INDEX_TYPE,
                     uniqueId,
                     entityMap,
                     cbServerProperties.getElasticCiosContentJsonPath()
