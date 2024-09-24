@@ -290,7 +290,7 @@ public class EsUtilServiceImpl implements EsUtilService {
         if (isNotBlank(searchString)) {
             boolQueryBuilder.must(
                     QueryBuilders.boolQuery()
-                            .should(new WildcardQueryBuilder("searchTags.keyword", "*" + searchString.toLowerCase() + "*")));
+                            .should(new WildcardQueryBuilder("contentSearchTags.keyword", "*" + searchString.toLowerCase() + "*")));
         }
     }
     private void addFacetsToSearchSourceBuilder(
