@@ -23,4 +23,6 @@ public interface CornellContentRepository extends JpaRepository<CornellContentEn
             "AND LOWER(c.cios_data->'content'->>'name') ILIKE LOWER(CONCAT('%', :keyword, '%'))",
             nativeQuery = true)
     Page<CornellContentEntity> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable, @Param("keyword") String keyword);
+
+    List<CornellContentEntity> findByExternalIdIn(List<String> externalIds);
 }

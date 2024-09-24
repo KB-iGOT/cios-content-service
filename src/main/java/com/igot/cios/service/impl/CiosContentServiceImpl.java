@@ -73,7 +73,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnerCode);
-            return;
+            throw new CiosContentException("Unknown provider name:" + partnerCode,HttpStatus.BAD_REQUEST);
         }
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
@@ -106,7 +106,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(dto.getPartnerCode());
         if (contentSource == null) {
             log.warn("Unknown provider name: " + dto.getPartnerCode());
-            return null;
+            throw new CiosContentException("Unknown provider name:" + dto.getPartnerCode(),HttpStatus.BAD_REQUEST);
         }
         try {
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
@@ -193,66 +193,15 @@ public class CiosContentServiceImpl implements CiosContentService {
 
     @Override
     public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
-        log.info("CiosContentServiceImpl:: deleteNotPublishContent: deleting non-published content");
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+        log.info("Deleting non-published content");
         String partnerCode = deleteContentRequestDto.getPartnerCode();
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
-            log.warn("Unknown provider name: " + partnerCode);
-            response.getParams().setStatus(Constants.FAILED);
-            response.getParams().setErr("Invalid partner name.");
-            response.setResponseCode(HttpStatus.BAD_REQUEST);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            log.warn("Unknown provider name: " + deleteContentRequestDto.getPartnerCode());
+            throw new CiosContentException("Unknown provider name:" + deleteContentRequestDto.getPartnerCode(),HttpStatus.BAD_REQUEST);
         }
-        List<String> externalIds = deleteContentRequestDto.getExternalId();
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
-        try {
-            List<?> allContent = service.fetchAllContent();
-            boolean hasValidationErrors = false;
-            StringBuilder validationErrors = new StringBuilder();
-            List<Object> validContentToDelete = new ArrayList<>();
-            for (String externalId : externalIds) {
-                Optional<?> contentEntityOpt = allContent.stream()
-                        .filter(content -> getExternalId(content).equals(externalId))
-                        .findFirst();
-                if (contentEntityOpt.isPresent()) {
-                    Object contentEntity = contentEntityOpt.get();
-                    boolean isActive = getIsActiveStatus(contentEntity);
-                    if (isActive) {
-                        validationErrors.append("External ID: ").append(externalId)
-                                .append(" is live, we can't delete live content.\n");
-                        hasValidationErrors = true;
-                    } else {
-                        validContentToDelete.add(contentEntity);
-                    }
-                } else {
-                    validationErrors.append("External ID: ").append(externalId)
-                            .append(" does not exist.\n");
-                    hasValidationErrors = true;
-                }
-            }
-            if (hasValidationErrors) {
-                log.error("Validation errors: {}", validationErrors.toString());
-                response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErr(validationErrors.toString());
-                response.setResponseCode(HttpStatus.BAD_REQUEST);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-            }
-
-            for (Object content : validContentToDelete) {
-                service.deleteContent(content);
-            }
-            response.getResult().put(Constants.STATUS, Constants.SUCCESS);
-            response.getResult().put(Constants.MESSAGE, "Content deleted successfully.");
-            response.setResponseCode(HttpStatus.OK);
-            return ResponseEntity.ok(response);
-        }catch (Exception e) {
-            log.error("Error occurred while deleting content: {}", e.getMessage());
-            response.getParams().setStatus(Constants.FAILED);
-            response.getParams().setErr("Error occurred while deleting content: " + e.getMessage());
-            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+        return service.deleteNotPublishContent(deleteContentRequestDto);
     }
 
     @Override
@@ -260,40 +209,17 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnercode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnercode);
-            return null;
+            throw new CiosContentException("Unknown provider name:" + partnercode,HttpStatus.BAD_REQUEST);
         }
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
         return service.readContentByExternalId(externalid);
     }
-
-
-    private String getExternalId(Object contentEntity) {
-        if (contentEntity instanceof CornellContentEntity) {
-            return ((CornellContentEntity) contentEntity).getExternalId();
-        } else if (contentEntity instanceof UpgradContentEntity) {
-            return ((UpgradContentEntity) contentEntity).getExternalId();
-        }
-        return null;
-    }
-
-    private boolean getIsActiveStatus(Object contentEntity) {
-        if (contentEntity instanceof CornellContentEntity) {
-            return ((CornellContentEntity) contentEntity).getIsActive();
-        } else if (contentEntity instanceof UpgradContentEntity) {
-            return ((UpgradContentEntity) contentEntity).getIsActive();
-        }
-        return false;
-    }
-
 
     @Override
     public SearchResult searchContent(SearchCriteria searchCriteria) {
         log.info("CiosContentServiceImpl::searchCotent");
         try {
             SearchResult searchResult = esUtilService.searchDocuments(Constants.CIOS_CONTENT_INDEX_NAME, searchCriteria);
-            redisTemplate.opsForValue()
-                    .set(generateRedisJwtTokenKey(searchCriteria), searchResult, searchResultRedisTtl,
-                            TimeUnit.SECONDS);
             return searchResult;
         } catch (Exception e) {
             throw new CiosContentException("ERROR", e.getMessage(), HttpStatus.BAD_REQUEST);
@@ -307,23 +233,9 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnerCode);
-            return null;
+            throw new CiosContentException("Unknown provider name:" + partnerCode,HttpStatus.BAD_REQUEST);
         }
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
         return service.updateContent(jsonNode,partnerCode);
-    }
-
-    private String generateRedisJwtTokenKey(Object requestPayload) {
-        if (requestPayload != null) {
-            try {
-                String reqJsonString = objectMapper.writeValueAsString(requestPayload);
-                return JWT.create()
-                        .withClaim(Constants.REQUEST_PAYLOAD, reqJsonString)
-                        .sign(Algorithm.HMAC256(Constants.JWT_SECRET_KEY));
-            } catch (JsonProcessingException e) {
-                log.error("Error occurred while converting json object to json string", e);
-            }
-        }
-        return "";
     }
 }

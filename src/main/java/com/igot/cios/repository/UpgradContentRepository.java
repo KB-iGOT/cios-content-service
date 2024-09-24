@@ -22,4 +22,6 @@ public interface UpgradContentRepository extends JpaRepository<UpgradContentEnti
             "AND LOWER(c.cios_data->'content'->>'name') ILIKE LOWER(CONCAT('%', :keyword, '%'))",
             nativeQuery = true)
     Page<UpgradContentEntity> findAllCiosDataAndIsActive(@Param("isActive") Boolean isActive, Pageable pageable, @Param("keyword") String keyword);
+
+    List<UpgradContentEntity> findByExternalIdIn(List<String> externalIds);
 }
