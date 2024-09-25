@@ -58,23 +58,23 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
     private RestHighLevelClient client;
 
     @Override
-    public void loadContentFromExcel(JsonNode processedData, String partnerCode,String fileName,String fileId,List<Object> contentJson){
+    public void loadContentFromExcel(JsonNode processedData, String partnerCode, String fileName, String fileId, List<Object> contentJson) {
         List<UpgradContentEntity> upgradContentEntityList = new ArrayList<>();
         processedData.forEach(eachContentData -> {
             JsonNode transformData = dataTransformUtility.transformData(eachContentData, contentJson);
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            ((ObjectNode)transformData.path("content")).put("fileId",fileId).asText();
-            ((ObjectNode)transformData.path("content")).put("source",fileName).asText();
-            ((ObjectNode)transformData.path("content")).put("partnerCode",partnerCode).asText();
-            ((ObjectNode)transformData.path("content")).put(Constants.STATUS,Constants.NOT_INITIATED).asText();
-            ((ObjectNode)transformData.path("content")).put(Constants.CREATED_DATE,currentTime.toString()).asText();
-            ((ObjectNode)transformData.path("content")).put(Constants.UPDATED_DATE,currentTime.toString()).asText();
-            ((ObjectNode)transformData.path("content")).put(Constants.ACTIVE,Constants.ACTIVE_STATUS).asText();
-            ((ObjectNode)transformData.path("content")).put(Constants.PUBLISHED_ON,"0000-00-00 00:00:00").asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.FILE_ID, fileId).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.SOURCE, fileName).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PARTNER_CODE, partnerCode).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.STATUS, Constants.NOT_INITIATED).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.CREATED_DATE, currentTime.toString()).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.UPDATED_DATE, currentTime.toString()).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.ACTIVE, Constants.ACTIVE_STATUS).asText();
+            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PUBLISHED_ON, "0000-00-00 00:00:00").asText();
             //dataTransformUtility.validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
             addSearchTags(transformData);
-            String externalId = transformData.path("content").path("externalId").asText();
-            UpgradContentEntity upgradContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime,fileId);
+            String externalId = transformData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
+            UpgradContentEntity upgradContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime, fileId);
             upgradContentEntityList.add(upgradContentEntity);
 
         });
@@ -83,9 +83,9 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
 
     private JsonNode addSearchTags(JsonNode transformData) {
         List<String> searchTags = new ArrayList<>();
-        searchTags.add(transformData.path("content").get("name").textValue().toLowerCase());
+        searchTags.add(transformData.path(Constants.CONTENT).get(Constants.NAME).textValue().toLowerCase());
         ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
-        ((ObjectNode)transformData.path("content")).put(Constants.CONTENT_SEARCH_TAGS, searchTagsArray);
+        ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.CONTENT_SEARCH_TAGS, searchTagsArray);
         return transformData;
     }
 
@@ -114,6 +114,7 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
         }
 
     }
+
     private void cornellBulkSave(List<UpgradContentEntity> upgradContentEntityList, String partnerCode) {
         repository.saveAll(upgradContentEntityList);
         BulkRequest bulkRequest = new BulkRequest();
@@ -147,38 +148,38 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
     }
 
     private void flattenContentData(Map<String, Object> entityMap) {
-        if (entityMap.containsKey("ciosData") && entityMap.get("ciosData") instanceof Map) {
-            Map<String, Object> ciosDataMap = (Map<String, Object>) entityMap.get("ciosData");
-            if (ciosDataMap.containsKey("content") && ciosDataMap.get("content") instanceof Map) {
-                Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get("content");
+        if (entityMap.containsKey(Constants.CIOS_DATA) && entityMap.get(Constants.CIOS_DATA) instanceof Map) {
+            Map<String, Object> ciosDataMap = (Map<String, Object>) entityMap.get(Constants.CIOS_DATA);
+            if (ciosDataMap.containsKey(Constants.CONTENT) && ciosDataMap.get(Constants.CONTENT) instanceof Map) {
+                Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get(Constants.CONTENT);
                 entityMap.putAll(contentMap);
-                entityMap.remove("ciosData");
+                entityMap.remove(Constants.CIOS_DATA);
             }
         }
     }
 
     @Override
     public Page<?> fetchAllContentFromSecondaryDb(RequestDto dto) {
-        Pageable pageable= PageRequest.of(dto.getPage(), dto.getSize());
-        return repository.findAllCiosDataAndIsActive(dto.getIsActive(),pageable,dto.getKeyword());
+        Pageable pageable = PageRequest.of(dto.getPage(), dto.getSize());
+        return repository.findAllCiosDataAndIsActive(dto.getIsActive(), pageable, dto.getKeyword());
     }
 
     @Override
     public Object readContentByExternalId(String externalid) {
         Optional<UpgradContentEntity> entity = repository.findByExternalId(externalid);
-        if(entity.isPresent()){
+        if (entity.isPresent()) {
             return entity.get().getCiosData();
-        }else{
-            throw new CiosContentException("No data found for given id",externalid, HttpStatus.BAD_REQUEST);
+        } else {
+            throw new CiosContentException("No data found for given id", externalid, HttpStatus.BAD_REQUEST);
         }
 
     }
 
     @Override
-    public Object updateContent(JsonNode jsonNode,String partnerCode) {
+    public Object updateContent(JsonNode jsonNode, String partnerCode) {
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-        String externalId=jsonNode.path("content").get("externalId").asText();
-        Boolean isActive=jsonNode.path("content").get("isActive").asBoolean(false);
+        String externalId = jsonNode.path("content").get("externalId").asText();
+        Boolean isActive = jsonNode.path("content").get("isActive").asBoolean(false);
         Optional<UpgradContentEntity> optExternalContent = repository.findByExternalId(externalId);
         if (optExternalContent.isPresent()) {
             UpgradContentEntity externalContent = optExternalContent.get();
@@ -199,8 +200,8 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
                     cbServerProperties.getElasticCiosContentJsonPath()
             );
             return externalContent;
-        }else{
-            throw new CiosContentException("Data not present in DB",HttpStatus.BAD_REQUEST);
+        } else {
+            throw new CiosContentException("Data not present in DB", HttpStatus.BAD_REQUEST);
         }
 
     }

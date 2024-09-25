@@ -80,6 +80,14 @@ public class Constants {
     public static final String PUBLISHED_ON = "publishedOn";
     public static final String ACTIVE_STATUS = "false";
     public static final String CONTENT_SEARCH_TAGS = "contentSearchTags";
+    public static final String CONTENT = "content";
+    public static final String FILE_ID = "fileId";
+    public static final String PARTNER_CODE = "partnerCode";
+    public static final String NAME = "name";
+    public static final String EXTERNAL_ID = "externalId";
+    public static final String CIOS_DATA = "ciosData";
+
+
 
 
 
