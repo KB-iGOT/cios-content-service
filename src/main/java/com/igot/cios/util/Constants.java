@@ -35,9 +35,9 @@ public class Constants {
     public static final String ERROR = "ERROR";
     public static final String REDIS_KEY_PREFIX = "cbpores_";
     public static final String CONTENT_PARTNER_REDIS_KEY_PREFIX = "contentpartner_";
-    public static final String CONTENT_UPLOAD_SUCCESSFULLY= "success";
-    public static final String CONTENT_UPLOAD_FAILED= "failed";
-    public static final String SOURCE= "source";
+    public static final String CONTENT_UPLOAD_SUCCESSFULLY = "success";
+    public static final String CONTENT_UPLOAD_FAILED = "failed";
+    public static final String SOURCE = "source";
     public static final String FETCH_RESULT_CONSTANT = ".fetchResult:";
     public static final String URI_CONSTANT = "URI: ";
     public static final String RESULT = "result";
@@ -56,19 +56,19 @@ public class Constants {
     public static final String SEARCH_OPERATION_LESS_THAN_EQUALS = "<=";
     public static final String SEARCH_OPERATION_GREATER_THAN_EQUALS = ">=";
     public static final String ASC = "asc";
-    public static final String BOOL="bool";
-    public static final String TERM="term";
-    public static final String TERMS="terms";
-    public static final String MATCH="match";
-    public static final String RANGE="range";
-    public static final String UNSUPPORTED_QUERY="Unsupported query type";
-    public static final String UNSUPPORTED_RANGE= "Unsupported range condition";
-    public static final String MUST= "must";
-    public static final String FILTER= "filter";
-    public static final String MUST_NOT="must_not";
-    public static final String SHOULD= "should";
+    public static final String BOOL = "bool";
+    public static final String TERM = "term";
+    public static final String TERMS = "terms";
+    public static final String MATCH = "match";
+    public static final String RANGE = "range";
+    public static final String UNSUPPORTED_QUERY = "Unsupported query type";
+    public static final String UNSUPPORTED_RANGE = "Unsupported range condition";
+    public static final String MUST = "must";
+    public static final String FILTER = "filter";
+    public static final String MUST_NOT = "must_not";
+    public static final String SHOULD = "should";
     public static final String ID = "id";
-    public static final String CIOS_CONTENT_INDEX_NAME= "cios_onboarding_content_entity";
+    public static final String CIOS_CONTENT_INDEX_NAME = "cios_onboarding_content_entity";
     public static final String REQUEST_PAYLOAD = "requestPayload";
     public static final String JWT_SECRET_KEY = "cios_search_result";
     public static final String API_VERSION_1 = "1.0";
@@ -86,9 +86,6 @@ public class Constants {
     public static final String NAME = "name";
     public static final String EXTERNAL_ID = "externalId";
     public static final String CIOS_DATA = "ciosData";
-
-
-
 
 
     private Constants() {

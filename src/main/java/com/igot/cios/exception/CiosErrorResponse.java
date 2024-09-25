@@ -9,8 +9,8 @@ import java.util.Map;
 @Builder
 public class CiosErrorResponse {
 
-  private String code;
-  private String message;
-  private Map<String, String> errors;
-  private String httpStatusCode;
+    private String code;
+    private String message;
+    private Map<String, String> errors;
+    private String httpStatusCode;
 }

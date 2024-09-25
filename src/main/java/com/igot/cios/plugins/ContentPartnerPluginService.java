@@ -12,9 +12,13 @@ import java.util.List;
 
 @Service
 public interface ContentPartnerPluginService {
-    void loadContentFromExcel(JsonNode processedData, String partnerCode,String fileName,String fileId,List<Object> contentJson) throws IOException;
+    void loadContentFromExcel(JsonNode processedData, String partnerCode, String fileName, String fileId, List<Object> contentJson) throws IOException;
+
     Page<?> fetchAllContentFromSecondaryDb(RequestDto dto);
+
     Object readContentByExternalId(String externalid);
-    Object updateContent(JsonNode jsonNode,String partnerCode);
+
+    Object updateContent(JsonNode jsonNode, String partnerCode);
+
     ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto);
 }

@@ -16,7 +16,9 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
+
 import static javax.xml.bind.DatatypeConverter.parseDate;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -178,14 +180,14 @@ public class DataTransformUtility {
         if (fileName == null) {
             throw new RuntimeException("File name is null");
         }
-        try (InputStream inputStream = file.getInputStream()){
+        try (InputStream inputStream = file.getInputStream()) {
             if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
                 Workbook workbook = WorkbookFactory.create(inputStream);
                 Sheet sheet = workbook.getSheetAt(0);
                 return processSheetAndSendMessage(sheet);
-            }else if (fileName.endsWith(".csv")) {
+            } else if (fileName.endsWith(".csv")) {
                 return processCsvAndSendMessage(inputStream);
-            }else {
+            } else {
                 throw new RuntimeException("Unsupported file type: " + fileName);
             }
         } catch (IOException e) {
@@ -196,7 +198,7 @@ public class DataTransformUtility {
 
     public String updatingPartnerInfo(JsonNode jsonNode) {
         log.info("CiosContentServiceImpl::updatingPartnerInfo:updating partner data");
-        String url=cbServerProperties.getCbPoresbaseUrl()+cbServerProperties.getPartnerCreateEndPoint();
+        String url = cbServerProperties.getCbPoresbaseUrl() + cbServerProperties.getPartnerCreateEndPoint();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -205,13 +207,12 @@ public class DataTransformUtility {
 
         // Make the POST request
         ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
-        if(response.getStatusCode().is2xxSuccessful()){
+        if (response.getStatusCode().is2xxSuccessful()) {
             return response.getBody();
-        }else{
-            throw new CiosContentException("Error from update content partner api",HttpStatus.INTERNAL_SERVER_ERROR);
+        } else {
+            throw new CiosContentException("Error from update content partner api", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-
 
 
     public JsonNode fetchPartnerInfoUsingApi(String partnerCode) {
@@ -262,6 +263,7 @@ public class DataTransformUtility {
         }
         return response;
     }
+
     public void validatePayload(String fileName, JsonNode payload) {
         try {
             log.debug("PayloadValidation :: validatePayload");

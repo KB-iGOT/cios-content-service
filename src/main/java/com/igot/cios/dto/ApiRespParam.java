@@ -1,8 +1,10 @@
 package com.igot.cios.dto;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -13,6 +15,7 @@ public class ApiRespParam {
     private String err;
     private String status;
     private String errmsg;
+
     public ApiRespParam(String string) {
     }
 }

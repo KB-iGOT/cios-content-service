@@ -1,4 +1,5 @@
 package com.igot.cios.dto;
+
 import com.igot.cios.util.Constants;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -6,9 +7,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.joda.time.DateTime;
 import org.springframework.http.HttpStatus;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -20,18 +23,23 @@ public class SBApiResponse {
     private ApiRespParam params;
     private HttpStatus responseCode;
     private transient Map<String, Object> result = new HashMap<>();
+
     public Object get(String key) {
         return result.get(key);
     }
+
     public void put(String key, Object vo) {
         result.put(key, vo);
     }
+
     public void putAll(Map<String, Object> map) {
         result.putAll(map);
     }
+
     public boolean containsKey(String key) {
         return result.containsKey(key);
     }
+
     public static SBApiResponse createDefaultResponse(String api) {
         SBApiResponse response = new SBApiResponse();
         response.setId(api);

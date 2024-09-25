@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Type;
 import org.hibernate.annotations.TypeDef;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -22,7 +23,7 @@ import java.sql.Timestamp;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name="cornell_content_entity")
+@Table(name = "cornell_content_entity")
 @TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
 public class CornellContentEntity implements Serializable {
     @Id
@@ -36,5 +37,5 @@ public class CornellContentEntity implements Serializable {
     @Type(type = "jsonb")
     @Column(columnDefinition = "jsonb")
     private JsonNode sourceData;
-    private  String fileId;
+    private String fileId;
 }

@@ -48,15 +48,15 @@ public class CourseSchedulerService {
     private void callCornellEnrollmentAPI(String orgId, JsonNode rawContentData) {
         try {
             log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
-            JsonNode entity=dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
-            List<Object> contentJson= Collections.singletonList(entity.path("result").get("transformProgressJson").toString());
-            JsonNode transformData = dataTransformUtility.transformData(rawContentData,contentJson);
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
+            List<Object> contentJson = Collections.singletonList(entity.path("result").get("transformProgressJson").toString());
+            JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             String extCourseId = transformData.get("courseid").asText();
             JsonNode result = callCiosReadApi(extCourseId);
             String courseId = result.path("content").get("contentId").asText();
             String[] parts = transformData.get("userid").asText().split("@");
-            ((ObjectNode)transformData).put("userid", parts[0]);
-            String userId=transformData.get("userid").asText();
+            ((ObjectNode) transformData).put("userid", parts[0]);
+            String userId = transformData.get("userid").asText();
             log.info("courseId  and userid {} {}", courseId, userId);
             Map<String, Object> propertyMap = new HashMap<>();
             propertyMap.put("userid", userId);
@@ -70,13 +70,13 @@ public class CourseSchedulerService {
                 ((ObjectNode) transformData).put("orgId", orgId);
                 payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
                 kafkaProducer.push(cbServerProperties.getTopic(), transformData);
-            }else{
-                log.info("Progress updated 100 for user {}",userId);
+            } else {
+                log.info("Progress updated 100 for user {}", userId);
             }
             log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {
             log.error("error while processing", e);
-            throw new CiosContentException(Constants.ERROR,e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -103,10 +103,10 @@ public class CourseSchedulerService {
                 JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
                 return jsonNode;
             } else {
-                throw new CiosContentException(Constants.ERROR,"Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
+                throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
             }
-        }catch (Exception e){
-            throw new CiosContentException(Constants.ERROR,e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (Exception e) {
+            throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
     }
@@ -138,7 +138,7 @@ public class CourseSchedulerService {
         LocalDate today = LocalDate.now();
         LocalDate startDate = today.minusDays(cbServerProperties.getCornellDateRange()); // Adjust the range as needed
         String completionRange = startDate.format(FORMATTER) + ":" + today.format(FORMATTER);
-        log.info("Completion Range {}",completionRange);
+        log.info("Completion Range {}", completionRange);
         Map<String, String> urlMap = new HashMap<>();
         urlMap.put("offset", "0");
         urlMap.put("limit", cbServerProperties.getCornellEnrollmentListLimit());

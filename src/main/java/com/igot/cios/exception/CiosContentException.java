@@ -10,7 +10,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Component
-public class CiosContentException extends RuntimeException{
+public class CiosContentException extends RuntimeException {
     private String code;
     private String message;
     private HttpStatus httpStatusCode;

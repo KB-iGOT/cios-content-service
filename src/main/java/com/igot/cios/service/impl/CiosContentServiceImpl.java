@@ -73,7 +73,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnerCode);
-            throw new CiosContentException("Unknown provider name:" + partnerCode,HttpStatus.BAD_REQUEST);
+            throw new CiosContentException("Unknown provider name:" + partnerCode, HttpStatus.BAD_REQUEST);
         }
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
@@ -106,12 +106,12 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(dto.getPartnerCode());
         if (contentSource == null) {
             log.warn("Unknown provider name: " + dto.getPartnerCode());
-            throw new CiosContentException("Unknown provider name:" + dto.getPartnerCode(),HttpStatus.BAD_REQUEST);
+            throw new CiosContentException("Unknown provider name:" + dto.getPartnerCode(), HttpStatus.BAD_REQUEST);
         }
         try {
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
             Page<?> pageData = service.fetchAllContentFromSecondaryDb(dto);
-            if(pageData!=null) {
+            if (pageData != null) {
                 return new PaginatedResponse<>(
                         pageData.getContent(),
                         pageData.getTotalPages(),
@@ -120,7 +120,7 @@ public class CiosContentServiceImpl implements CiosContentService {
                         pageData.getSize(),
                         pageData.getNumber()
                 );
-            }else{
+            } else {
                 return new PaginatedResponse<>(
                         Collections.emptyList(),
                         0,
@@ -162,7 +162,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             });
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
-            ((ObjectNode)transformData).put("orgId",orgId);
+            ((ObjectNode) transformData).put("orgId", orgId);
             kafkaProducer.push(topic, transformData);
             log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {
@@ -198,7 +198,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + deleteContentRequestDto.getPartnerCode());
-            throw new CiosContentException("Unknown provider name:" + deleteContentRequestDto.getPartnerCode(),HttpStatus.BAD_REQUEST);
+            throw new CiosContentException("Unknown provider name:" + deleteContentRequestDto.getPartnerCode(), HttpStatus.BAD_REQUEST);
         }
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
         return service.deleteNotPublishContent(deleteContentRequestDto);
@@ -209,7 +209,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnercode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnercode);
-            throw new CiosContentException("Unknown provider name:" + partnercode,HttpStatus.BAD_REQUEST);
+            throw new CiosContentException("Unknown provider name:" + partnercode, HttpStatus.BAD_REQUEST);
         }
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
         return service.readContentByExternalId(externalid);
@@ -229,13 +229,13 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public Object updateContent(JsonNode jsonNode) {
         log.info("CiosContentServiceImpl::updateContent");
-        String partnerCode=jsonNode.path("content").get("partnerCode").asText();
+        String partnerCode = jsonNode.path("content").get("partnerCode").asText();
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnerCode);
-            throw new CiosContentException("Unknown provider name:" + partnerCode,HttpStatus.BAD_REQUEST);
+            throw new CiosContentException("Unknown provider name:" + partnerCode, HttpStatus.BAD_REQUEST);
         }
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
-        return service.updateContent(jsonNode,partnerCode);
+        return service.updateContent(jsonNode, partnerCode);
     }
 }

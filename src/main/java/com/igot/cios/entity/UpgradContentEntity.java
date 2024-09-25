@@ -21,7 +21,7 @@ import java.sql.Timestamp;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name="upgrad_content_entity")
+@Table(name = "upgrad_content_entity")
 @TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
 public class UpgradContentEntity implements Serializable {
     @Id
@@ -36,5 +36,5 @@ public class UpgradContentEntity implements Serializable {
     @Column(columnDefinition = "jsonb")
     private JsonNode sourceData;
     private String publishedOn;
-    private  String fileId;
+    private String fileId;
 }

@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.HashMap;
 import java.util.List;
 
@@ -80,8 +81,8 @@ public class CiosContentController {
     }
 
     @GetMapping("/v1/read/content/{partnercode}/{externalid}")
-    public ResponseEntity<?> readContentByExternalId(@PathVariable String partnercode,@PathVariable String externalid) {
-        Object response = ciosContentService.readContentByExternalId(partnercode,externalid);
+    public ResponseEntity<?> readContentByExternalId(@PathVariable String partnercode, @PathVariable String externalid) {
+        Object response = ciosContentService.readContentByExternalId(partnercode, externalid);
         return ResponseEntity.ok(response);
     }
 
