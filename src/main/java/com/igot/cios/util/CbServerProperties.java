@@ -11,9 +11,6 @@ import org.springframework.stereotype.Component;
 @Setter
 public class CbServerProperties {
 
-    @Value("${cios.read.api.base.url}")
-    private String cbPoresbaseUrl;
-
     @Value("${cios.read.api.fixed.url}")
     private String fixedUrl;
 
@@ -42,7 +39,7 @@ public class CbServerProperties {
     private int cornellDateRange;
 
     @Value("${cb.pores.service.url}")
-    private String partnerServiceUrl;
+    private String cbPoresbaseUrl;
 
     @Value("${partner.read.path}")
     private String partnerReadEndPoint;
@@ -52,4 +49,10 @@ public class CbServerProperties {
 
     @Value("${elastic.required.field.cios.content.json.path}")
     private String elasticCiosContentJsonPath;
+
+    @Value("${cb.ext.service.url}")
+    private String cbExtbaseUrl;
+
+    @Value("${storage.upload.cios.log.file}")
+    private String uploadCiosLogsFileEndPoint;
 }

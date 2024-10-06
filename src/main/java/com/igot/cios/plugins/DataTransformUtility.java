@@ -16,9 +16,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
-
 import static javax.xml.bind.DatatypeConverter.parseDate;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -215,9 +213,10 @@ public class DataTransformUtility {
     }
 
 
+
     public JsonNode fetchPartnerInfoUsingApi(String partnerCode) {
         log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerCode");
-        String getApiUrl = cbServerProperties.getPartnerServiceUrl() + cbServerProperties.getPartnerReadEndPoint() + partnerCode;
+        String getApiUrl = cbServerProperties.getCbPoresbaseUrl() + cbServerProperties.getPartnerReadEndPoint() + partnerCode;
         Map<String, String> headers = new HashMap<>();
         Map<String, Object> readData = (Map<String, Object>) fetchResultUsingGet(getApiUrl, headers);
 
@@ -295,8 +294,8 @@ public class DataTransformUtility {
         }
     }
 
-    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status) {
-        log.info("CiosContentService:: createFileInfo: creating file information");
+    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status, String uploadedGCPFileUrl) {
+        log.info("CiosContentService:: createFileInfo: creating file information {}", partnerId);
         FileInfoEntity fileInfoEntity = new FileInfoEntity();
         if (fileId == null) {
             fileInfoEntity = new FileInfoEntity();
@@ -309,9 +308,74 @@ public class DataTransformUtility {
         fileInfoEntity.setCompletedOn(completedOn);
         fileInfoEntity.setStatus(status);
         fileInfoEntity.setPartnerId(partnerId);
+        fileInfoEntity.setGCPFileName(uploadedGCPFileUrl);
         fileInfoRepository.save(fileInfoEntity);
         log.info("created successfully fileInfo {}", fileId);
         return fileId;
     }
 
+    public String uploadLogFileToGCP(String logFilePath) {
+        log.info("LogUploadService::uploadLogFileToGCP: Uploading log file to GCP");
+        String url = cbServerProperties.getCbExtbaseUrl() + cbServerProperties.getUploadCiosLogsFileEndPoint() + logFilePath;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            try {
+                JsonNode responseBody = objectMapper.readTree(response.getBody());
+                String uploadedFileUrl = responseBody.path(Constants.RESULT).path(Constants.NAME).asText();
+                log.info("Log file uploaded successfully. File URL: {}", uploadedFileUrl);
+                return uploadedFileUrl;
+            } catch (JsonProcessingException e) {
+                log.error("Error parsing the response from GCP log upload: {}", e.getMessage());
+                throw new CiosContentException("PARSE_ERROR", "Failed to parse the response from GCP log upload.", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } else {
+            log.error("Error uploading log file. Status: {}", response.getStatusCode());
+            throw new CiosContentException("UPLOAD_ERROR", "Error from log file upload API: " + response.getStatusCode(), response.getStatusCode());
+        }
+    }
+
+    public String getSchemaFilePathForPartner(String partnerCode) {
+        ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
+        switch (Objects.requireNonNull(contentSource)) {
+            case CORNELL:
+                return Constants.DATA_PAYLOAD_CORNELL_LOGS_VALIDATION_FILE;
+            case UPGRAD:
+                return Constants.DATA_PAYLOAD_UPGRAD_LOGS_VALIDATION_FILE;
+            default:
+                throw new IllegalArgumentException("No validation schema found for partner: " + partnerCode);
+        }
+    }
+
+    public List<String> validateRowData(Map<String, String> row, String schemaFilePath) {
+        List<String> invalidErrList = new ArrayList<>();
+        try {
+            JsonNode rowNode = objectMapper.convertValue(row, JsonNode.class);
+
+            JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
+            InputStream schemaStream = getClass().getResourceAsStream(schemaFilePath);
+            JsonSchema schema = schemaFactory.getSchema(schemaStream);
+            if (rowNode.isArray()) {
+                for (JsonNode objectNode : rowNode) {
+                    validateRowDataObject(schema, objectNode, invalidErrList);
+                }
+            } else {
+                validateRowDataObject(schema, rowNode, invalidErrList);
+            }
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(e);
+        }
+        return invalidErrList;
+    }
+
+    private void validateRowDataObject(JsonSchema schema, JsonNode objectNode, List<String> invalidErrList) {
+        Set<ValidationMessage> validationMessages = schema.validate(objectNode);
+        if (!validationMessages.isEmpty()) {
+            for (ValidationMessage message : validationMessages) {
+                invalidErrList.add(message.getMessage());
+            }
+        }
+    }
 }
