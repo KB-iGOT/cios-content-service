@@ -1,23 +1,17 @@
 package com.igot.cios.service.impl;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.igot.cios.dto.SBApiResponse;
-import com.igot.cios.plugins.ContentSource;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
-import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.FileInfoEntity;
-import com.igot.cios.entity.UpgradContentEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.ContentPartnerPluginService;
+import com.igot.cios.plugins.ContentSource;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.plugins.config.ContentPartnerServiceFactory;
 import com.igot.cios.repository.FileInfoRepository;
@@ -33,13 +27,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 
 @Service
@@ -77,7 +74,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
-        String fileId = dataTransformUtility.createFileInfo(null, null, fileName, initiatedOn, null, null);
+        String fileId = dataTransformUtility.createFileInfo(null, null, fileName, initiatedOn, null, null, null);
         try {
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
@@ -89,13 +86,12 @@ public class CiosContentServiceImpl implements CiosContentService {
             if (contentJson == null || contentJson.isEmpty()) {
                 throw new CiosContentException("Transformation data not present in content partner db", HttpStatus.INTERNAL_SERVER_ERROR);
             }
+            processRowsAndCreateLogs(processedData, entity, fileId, fileName, initiatedOn,partnerCode);
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
             service.loadContentFromExcel(jsonData, partnerCode, fileName, fileId, contentJson);
-            Timestamp completedOn = new Timestamp(System.currentTimeMillis());
-            dataTransformUtility.createFileInfo(entity.path("result").get("id").asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY);
         } catch (Exception e) {
             JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            dataTransformUtility.createFileInfo(entity.get("id").asText(), fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED);
+            dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED,null);
             throw new RuntimeException(e.getMessage());
         }
     }
@@ -238,4 +234,91 @@ public class CiosContentServiceImpl implements CiosContentService {
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
         return service.updateContent(jsonNode, partnerCode);
     }
+
+    private void processRowsAndCreateLogs(List<Map<String, String>> processedData, JsonNode entity, String fileId, String fileName, Timestamp initiatedOn, String partnerCode) throws IOException {
+        log.info("Starting row validation and log generation for file: {}", fileName);
+        List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
+        List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
+        boolean hasFailures = false;
+        String schemaFilePath = dataTransformUtility.getSchemaFilePathForPartner(partnerCode);
+
+        for (Map<String, String> row : processedData) {
+            LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
+            List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, schemaFilePath);
+            if (validationErrors.isEmpty()) {
+                linkedRow.put(Constants.STATUS, Constants.SUCCESS);
+                linkedRow.put("error", "");
+                successLogs.add(linkedRow);
+            } else {
+                linkedRow.put(Constants.STATUS, Constants.FAILED);
+                linkedRow.put("error", String.join(", ", validationErrors));
+                errorLogs.add(linkedRow);
+                hasFailures = true;
+                log.warn("Validation failed for row: {}. Errors: {}", row, validationErrors);
+            }
+        }
+        List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>();
+        combinedLogs.addAll(successLogs);
+        combinedLogs.addAll(errorLogs);
+
+        String logFileName = fileName + "_" + partnerCode;
+        String logFilePath = writeLogsToFile(combinedLogs, logFileName);
+        String uploadedGCPFileName = dataTransformUtility.uploadLogFileToGCP(logFilePath);
+
+        Timestamp completedOn = new Timestamp(System.currentTimeMillis());
+        if (hasFailures) {
+            log.info("Marking file: {} as failed due to validation errors", fileName);
+            dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_FAILED, uploadedGCPFileName);
+        } else {
+            log.info("Marking file: {} as successful, no validation errors found", fileName);
+            dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY, uploadedGCPFileName);
+        }
+    }
+
+    private String writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
+        log.info("Logs written to file: {}", originalFileName);
+        String csvFileName = originalFileName + "_log.csv";
+        String tempDir = System.getProperty("java.io.tmpdir");
+        String csvFilePath = tempDir + File.separator + csvFileName;
+        File dir = new File(tempDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        try (FileWriter writer = new FileWriter(csvFilePath)) {
+            if (!logs.isEmpty()) {
+                LinkedHashMap<String, String> firstLog = logs.get(0);
+
+                StringBuilder header = new StringBuilder();
+                for (String key : firstLog.keySet()) {
+                    header.append(escapeSpecialCharacters(key)).append(" | ");
+                }
+                header.append(Constants.TIME);
+                writer.write(header.toString());
+                writer.write(System.lineSeparator());
+
+                for (LinkedHashMap<String, String> logEntry : logs) {
+                    StringBuilder row = new StringBuilder();
+
+                    for (String key : firstLog.keySet()) {
+                        row.append(escapeSpecialCharacters(logEntry.getOrDefault(key, ""))).append(" | ");
+                    }
+                    String timestamp = new Timestamp(System.currentTimeMillis()).toString();
+                    row.append(timestamp);
+
+                    writer.write(row.toString());
+                    writer.write(System.lineSeparator());
+                }
+            }
+        }
+        return csvFilePath;
+    }
+
+    private String escapeSpecialCharacters(String value) {
+        String escapedValue = value;
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return escapedValue;
+    }
+
 }

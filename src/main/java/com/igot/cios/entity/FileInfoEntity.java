@@ -29,4 +29,6 @@ public class FileInfoEntity {
     private String status;
 
     private String partnerId;
+
+    private String GCPFileName;
 }
