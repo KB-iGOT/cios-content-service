@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "Program Code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Program Title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "short description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "long description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Duration": {
+      "type": "string",
+      "pattern": "^\\d+\\s*(hours?|days?|weeks?|months?)$"
+    },
+    "photo URL": {
+      "type": "string"
+    },
+    "Total Course Count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "Redirection URL": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "Program Code",
+    "Program Title",
+    "short description",
+    "long description",
+    "Duration",
+    "Total Course Count",
+    "Redirection URL"
+  ]
+}

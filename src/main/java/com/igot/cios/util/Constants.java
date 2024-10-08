@@ -86,6 +86,9 @@ public class Constants {
     public static final String NAME = "name";
     public static final String EXTERNAL_ID = "externalId";
     public static final String CIOS_DATA = "ciosData";
+    public static final String DATA_PAYLOAD_CORNELL_LOGS_VALIDATION_FILE = "/PayloadValidation/CornellFileLogsValidation.json";
+    public static final String DATA_PAYLOAD_UPGRAD_LOGS_VALIDATION_FILE = "/PayloadValidation/UpgradFileLogsValidation.json";
+    public static final String TIME = "Time";
 
 
     private Constants() {
