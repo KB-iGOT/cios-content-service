@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "lessonName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lessonDescription": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lessonDuration": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lessonLink": {
+      "type": "string",
+      "minLength": 1
+    },
+    "imageUrl": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1
+    },
+    "lessonCode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lessonObjectives": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lessonTopic": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "lessonName",
+    "lessonDescription",
+    "lessonDuration",
+    "lessonLink",
+    "imageUrl",
+    "lessonCode",
+    "lessonObjectives",
+    "lessonTopic"
+  ]
+}
