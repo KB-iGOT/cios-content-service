@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string"
+        },
+        "fileId": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "live",
+            "draft",
+            "archived"
+          ]
+        },
+        "appIcon": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "externalId": {
+          "type": "string"
+        },
+        "objectives": {
+          "type": "string"
+        },
+        "searchTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string"
+        },
+        "partnerCode": {
+          "type": "string"
+        },
+        "publishedOn": {
+          "type": "string"
+        },
+        "redirectUrl": {
+          "type": "string"
+        },
+        "updatedDate": {
+          "type": "string"
+        },
+        "contentPartner": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "link": {
+              "type": "string"
+            },
+            "isActive": {
+              "type": "boolean"
+            },
+            "websiteUrl": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "documentUrl": {
+              "type": "string"
+            },
+            "partnerCode": {
+              "type": "string"
+            },
+            "contentPartnerName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "link",
+            "isActive",
+            "partnerCode",
+            "contentPartnerName"
+          ]
+        },
+        "competencies_v5": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "competencyArea": {
+                "type": "string"
+              },
+              "competencyTheme": {
+                "type": "string"
+              },
+              "competencyAreaId": {
+                "type": "integer"
+              },
+              "competencyThemeId": {
+                "type": "integer"
+              },
+              "competencySubTheme": {
+                "type": "string"
+              },
+              "competencyThemeType": {
+                "type": "string"
+              },
+              "competencySubThemeId": {
+                "type": "integer"
+              },
+              "competencyAreaDescription": {
+                "type": "string"
+              },
+              "competencyThemeDescription": {
+                "type": "string"
+              },
+              "competencySubThemeDescription": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "competencyArea",
+              "competencyTheme",
+              "competencyAreaId",
+              "competencyThemeId",
+              "competencySubTheme",
+              "competencyThemeType",
+              "competencySubThemeId"
+            ]
+          }
+        },
+        "contentSearchTags": {
+          "type": "keyword"
+        }
+      },
+      "required": [
+        "name",
+        "topic",
+        "fileId",
+        "status",
+        "isActive",
+        "externalId",
+        "createdDate",
+        "description",
+        "partnerCode",
+        "publishedOn",
+        "updatedDate",
+        "contentPartner"
+      ]
+    }
+  }
+}

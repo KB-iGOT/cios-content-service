@@ -135,6 +135,11 @@
 			<artifactId>commons-csv</artifactId>
 			<version>1.9.0</version>
 		</dependency>
+		<dependency>
+			<groupId>net.karmayogibharat</groupId>
+			<artifactId>cloud-store-sdk_2.11</artifactId>
+			<version>1.4.6</version>
+		</dependency>
 	</dependencies>
 
 	<build>
