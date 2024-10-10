@@ -314,29 +314,6 @@ public class DataTransformUtility {
         return fileId;
     }
 
-    public String uploadLogFileToGCP(String logFilePath) {
-        log.info("LogUploadService::uploadLogFileToGCP: Uploading log file to GCP");
-        String url = cbServerProperties.getCbExtbaseUrl() + cbServerProperties.getUploadCiosLogsFileEndPoint() + logFilePath;
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
-        if (response.getStatusCode().is2xxSuccessful()) {
-            try {
-                JsonNode responseBody = objectMapper.readTree(response.getBody());
-                String uploadedFileUrl = responseBody.path(Constants.RESULT).path(Constants.NAME).asText();
-                log.info("Log file uploaded successfully. File URL: {}", uploadedFileUrl);
-                return uploadedFileUrl;
-            } catch (JsonProcessingException e) {
-                log.error("Error parsing the response from GCP log upload: {}", e.getMessage());
-                throw new CiosContentException("PARSE_ERROR", "Failed to parse the response from GCP log upload.", HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        } else {
-            log.error("Error uploading log file. Status: {}", response.getStatusCode());
-            throw new CiosContentException("UPLOAD_ERROR", "Error from log file upload API: " + response.getStatusCode(), response.getStatusCode());
-        }
-    }
-
     public String getSchemaFilePathForPartner(String partnerCode) {
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         switch (Objects.requireNonNull(contentSource)) {

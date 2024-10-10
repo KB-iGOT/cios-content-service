@@ -78,7 +78,7 @@ public class Constants {
     public static final String CREATED_DATE = "createdDate";
     public static final String ACTIVE = "isActive";
     public static final String PUBLISHED_ON = "publishedOn";
-    public static final String ACTIVE_STATUS = "false";
+    public static final Boolean ACTIVE_STATUS = false;
     public static final String CONTENT_SEARCH_TAGS = "contentSearchTags";
     public static final String CONTENT = "content";
     public static final String FILE_ID = "fileId";
@@ -89,6 +89,9 @@ public class Constants {
     public static final String DATA_PAYLOAD_CORNELL_LOGS_VALIDATION_FILE = "/PayloadValidation/CornellFileLogsValidation.json";
     public static final String DATA_PAYLOAD_UPGRAD_LOGS_VALIDATION_FILE = "/PayloadValidation/UpgradFileLogsValidation.json";
     public static final String TIME = "Time";
+    public static final String URL = "url";
+    public static final String UPDATED_DATA_PAYLOAD_VALIDATION_FILE = "/PayloadValidation/ContentUpdateFileValidation.json";
+
 
 
     private Constants() {

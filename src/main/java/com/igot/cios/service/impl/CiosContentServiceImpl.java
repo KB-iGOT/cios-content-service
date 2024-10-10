@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
@@ -16,6 +17,8 @@ import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.plugins.config.ContentPartnerServiceFactory;
 import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.service.CiosContentService;
+import com.igot.cios.storage.StoreFileToGCP;
+import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
 import com.igot.cios.util.elasticsearch.dto.SearchCriteria;
@@ -63,6 +66,10 @@ public class CiosContentServiceImpl implements CiosContentService {
     private long searchResultRedisTtl;
     @Autowired
     private RedisTemplate<String, SearchResult> redisTemplate;
+    @Autowired
+    private StoreFileToGCP storeFileToGCP;
+    @Autowired
+    private CbServerProperties cbServerProperties;
 
     @Override
     public void loadContentFromExcel(MultipartFile file, String partnerCode) {
@@ -232,6 +239,7 @@ public class CiosContentServiceImpl implements CiosContentService {
             throw new CiosContentException("Unknown provider name:" + partnerCode, HttpStatus.BAD_REQUEST);
         }
         ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
+        dataTransformUtility.validatePayload(Constants.UPDATED_DATA_PAYLOAD_VALIDATION_FILE, jsonNode);
         return service.updateContent(jsonNode, partnerCode);
     }
 
@@ -260,8 +268,15 @@ public class CiosContentServiceImpl implements CiosContentService {
         combinedLogs.addAll(successLogs);
         combinedLogs.addAll(errorLogs);
         String logFileName = fileName + "_" + partnerCode;
-        String logFilePath = writeLogsToFile(combinedLogs, logFileName);
-        String uploadedGCPFileName = dataTransformUtility.uploadLogFileToGCP(logFilePath);
+        File logFile= writeLogsToFile(combinedLogs, logFileName);
+        SBApiResponse uploadedGCPFileResponse = storeFileToGCP.uploadCiosLogsFile(logFile,cbServerProperties.getCiosCloudContainerName(), cbServerProperties.getCiosFileLogsCloudFolderName());
+        String uploadedGCPFileName = "";
+        if (uploadedGCPFileResponse.getParams().getStatus().equals(Constants.SUCCESS)) {
+            uploadedGCPFileName = uploadedGCPFileResponse.getResult().get(Constants.NAME).toString();
+            log.info("Log file uploaded successfully. File URL: {}", uploadedGCPFileName);
+        } else {
+            log.error("Failed to upload log file. Error message: {}", uploadedGCPFileResponse.getParams().getErrmsg());
+        }
         Timestamp completedOn = new Timestamp(System.currentTimeMillis());
         if (hasFailures) {
             log.info("Marking file: {} as failed due to validation errors", fileName);
@@ -272,14 +287,15 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
     }
 
-    private String writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
+    private File writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
         log.info("Logs written to file: {}", originalFileName);
         String csvFileName = originalFileName + "_log.csv";
         String tempDir = System.getProperty("java.io.tmpdir");
         String csvFilePath = tempDir + File.separator + csvFileName;
-        File dir = new File(tempDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
+        File logFile = new File(csvFilePath);
+        if (!logFile.exists()) {
+            logFile.getParentFile().mkdirs();
+            logFile.createNewFile();
         }
         try (FileWriter writer = new FileWriter(csvFilePath)) {
             if (!logs.isEmpty()) {
@@ -305,7 +321,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return csvFilePath;
+        return logFile;
     }
 
     private String escapeSpecialCharacters(String value) {

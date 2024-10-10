@@ -55,4 +55,22 @@ public class CbServerProperties {
 
     @Value("${storage.upload.cios.log.file}")
     private String uploadCiosLogsFileEndPoint;
+
+    @Value("${cloud.storage.type.name}")
+    private String cloudStorageTypeName;
+
+    @Value("${cloud.storage.secret}")
+    private String cloudStorageSecret;
+
+    @Value("${cloud.storage.key}")
+    private String cloudStorageKey;
+
+    @Value("${cloud.storage.endpoint}")
+    private String cloudStorageEndpoint;
+
+    @Value("${cios.cloud.container.name}")
+    private String ciosCloudContainerName;
+
+    @Value("${cios.logs.cloud.folder.name}")
+    private String ciosFileLogsCloudFolderName;
 }

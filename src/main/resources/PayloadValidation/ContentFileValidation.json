@@ -71,16 +71,13 @@
           "type": "boolean"
         },
         "createdDate": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "updatedDate": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "publishedOn": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "contentSearchTags": {
           "type": "keyword"

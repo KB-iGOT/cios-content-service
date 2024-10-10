@@ -71,7 +71,7 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
             ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.UPDATED_DATE, currentTime.toString()).asText();
             ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.ACTIVE, Constants.ACTIVE_STATUS).asText();
             ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PUBLISHED_ON, "0000-00-00 00:00:00").asText();
-            //dataTransformUtility.validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
+            dataTransformUtility.validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
             addSearchTags(transformData);
             String externalId = transformData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
             UpgradContentEntity upgradContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime, fileId);
