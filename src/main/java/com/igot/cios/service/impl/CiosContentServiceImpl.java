@@ -232,7 +232,7 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public Object updateContent(JsonNode jsonNode) {
         log.info("CiosContentServiceImpl::updateContent");
-        String partnerCode = jsonNode.path("content").get("partnerCode").asText();
+        String partnerCode = jsonNode.path("content").get("contentPartner").get("partnerCode").asText();
         ContentSource contentSource = ContentSource.fromPartnerCode(partnerCode);
         if (contentSource == null) {
             log.warn("Unknown provider name: " + partnerCode);

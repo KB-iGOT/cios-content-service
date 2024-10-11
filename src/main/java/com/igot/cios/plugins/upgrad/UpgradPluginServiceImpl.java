@@ -154,6 +154,7 @@ public class UpgradPluginServiceImpl implements ContentPartnerPluginService {
                 Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get(Constants.CONTENT);
                 entityMap.putAll(contentMap);
                 entityMap.remove(Constants.CIOS_DATA);
+                entityMap.remove(Constants.SOURCE_DATA);
             }
         }
     }
