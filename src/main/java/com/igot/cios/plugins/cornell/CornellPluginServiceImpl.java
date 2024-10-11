@@ -153,7 +153,8 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
             if (ciosDataMap.containsKey("content") && ciosDataMap.get("content") instanceof Map) {
                 Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get("content");
                 entityMap.putAll(contentMap);
-                entityMap.remove("ciosData");
+                entityMap.remove(Constants.CIOS_DATA);
+                entityMap.remove(Constants.SOURCE_DATA);
             }
         }
     }

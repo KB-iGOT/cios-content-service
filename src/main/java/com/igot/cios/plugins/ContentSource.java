@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum ContentSource {
     CORNELL("${cornell.partner.code}"),
-    UPGRAD("${upgrad.partner.code}");
+    UPGRAD("${upgrad.partner.code}"),
+    COURSERA("${coursera.partner.code}");
 
     private String value;
 

@@ -47,8 +47,7 @@
           }
         },
         "createdDate": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "description": {
           "type": "string"
@@ -74,16 +73,7 @@
             "link": {
               "type": "string"
             },
-            "isActive": {
-              "type": "boolean"
-            },
             "websiteUrl": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "documentUrl": {
               "type": "string"
             },
             "partnerCode": {
@@ -91,14 +81,20 @@
             },
             "contentPartnerName": {
               "type": "string"
+            },
+            "providerTips": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
             "id",
             "link",
-            "isActive",
             "partnerCode",
-            "contentPartnerName"
+            "contentPartnerName",
+            "providerTips"
           ]
         },
         "competencies_v5": {
@@ -155,15 +151,11 @@
       "required": [
         "name",
         "topic",
-        "fileId",
         "status",
         "isActive",
         "externalId",
-        "createdDate",
         "description",
-        "partnerCode",
         "publishedOn",
-        "updatedDate",
         "contentPartner"
       ]
     }
