@@ -93,9 +93,9 @@ public class CiosContentServiceImpl implements CiosContentService {
             if (contentJson == null || contentJson.isEmpty()) {
                 throw new CiosContentException("Transformation data not present in content partner db", HttpStatus.INTERNAL_SERVER_ERROR);
             }
-            processRowsAndCreateLogs(processedData, entity, fileId, fileName, initiatedOn,partnerCode);
             ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
             service.loadContentFromExcel(jsonData, partnerCode, fileName, fileId, contentJson);
+            processRowsAndCreateLogs(processedData, entity, fileId, fileName, initiatedOn,partnerCode);
         } catch (Exception e) {
             JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED, null);
