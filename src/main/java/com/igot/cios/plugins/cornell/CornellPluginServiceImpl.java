@@ -117,28 +117,23 @@ public class CornellPluginServiceImpl implements ContentPartnerPluginService {
 
     private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList, String partnerCode) {
         cornellContentRepository.saveAll(cornellContentEntityList);
-        BulkRequest bulkRequest = new BulkRequest();
         cornellContentEntityList.forEach(contentEntity -> {
             try {
                 Map<String, Object> entityMap = objectMapper.convertValue(contentEntity, Map.class);
                 flattenContentData(entityMap);
                 String uniqueId = partnerCode + "_" + contentEntity.getExternalId();
-
-                IndexRequest indexRequest = new IndexRequest(Constants.CIOS_CONTENT_INDEX_NAME)
-                        .id(uniqueId)
-                        .source(entityMap);
-
-                bulkRequest.add(indexRequest);
-                log.info("Preparing to add document for externalId: {}", contentEntity.getExternalId());
+                esUtilService.addDocument(
+                        Constants.CIOS_CONTENT_INDEX_NAME,
+                        Constants.INDEX_TYPE,
+                        uniqueId,
+                        entityMap,
+                        cbServerProperties.getElasticCiosContentJsonPath()
+                );
+                log.info("Added data to ES document for externalId: {}", contentEntity.getExternalId());
             } catch (Exception e) {
                 log.error("Error while processing contentEntity with externalId: {}", contentEntity.getExternalId(), e);
             }
         });
-        try {
-            client.bulk(bulkRequest, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
         Long totalCourseCount = cornellContentRepository.count();
         JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
         JsonNode resultData = response.path(Constants.RESULT);
