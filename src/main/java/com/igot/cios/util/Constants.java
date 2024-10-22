@@ -92,6 +92,8 @@ public class Constants {
     public static final String TIME = "Time";
     public static final String URL = "url";
     public static final String UPDATED_DATA_PAYLOAD_VALIDATION_FILE = "/PayloadValidation/ContentUpdateFileValidation.json";
+    public static final String FILE_NAME = "fileName";
+    public static final String INITIATED_ON = "initiatedOn";
 
 
 
