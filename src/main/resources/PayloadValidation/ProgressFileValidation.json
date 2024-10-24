@@ -12,12 +12,16 @@
     },
     "completedon": {
       "type": "string"
-
     },
     "status": {
       "type": "string"
     },
-
+    "partnerCode": {
+      "type": "string"
+    },
+    "partnerId": {
+      "type": "string"
+    },
     "required": [
       "userid",
       "courseid",
