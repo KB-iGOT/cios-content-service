@@ -145,29 +145,30 @@ public class CiosContentServiceImpl implements CiosContentService {
     }
 
     @Override
-    public void loadContentProgressFromExcel(MultipartFile file, String orgId) {
+    public void loadContentProgressFromExcel(MultipartFile file, String partnerCode) {
         try {
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
             JsonNode jsonData = objectMapper.valueToTree(processedData);
             jsonData.forEach(
                     eachContentData -> {
-                        callEnrollmentAPI(eachContentData, orgId);
+                        callEnrollmentAPI(eachContentData, partnerCode);
                     });
         } catch (Exception e) {
             throw new CiosContentException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    private void callEnrollmentAPI(JsonNode rawContentData, String orgId) {
+    private void callEnrollmentAPI(JsonNode rawContentData, String partnerCode) {
         try {
             log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("transformProgressJson"), new TypeReference<List<Object>>() {
             });
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
-            ((ObjectNode) transformData).put("orgId", orgId);
+            ((ObjectNode) transformData).put("partnerCode", partnerCode);
+            ((ObjectNode) transformData).put("partnerId", entity.get("id").asText());
             kafkaProducer.push(topic, transformData);
             log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {

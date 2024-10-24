@@ -50,12 +50,6 @@ public class CbServerProperties {
     @Value("${elastic.required.field.cios.content.json.path}")
     private String elasticCiosContentJsonPath;
 
-    @Value("${cb.ext.service.url}")
-    private String cbExtbaseUrl;
-
-    @Value("${storage.upload.cios.log.file}")
-    private String uploadCiosLogsFileEndPoint;
-
     @Value("${cloud.storage.type.name}")
     private String cloudStorageTypeName;
 

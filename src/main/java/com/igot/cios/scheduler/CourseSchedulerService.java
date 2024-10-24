@@ -45,10 +45,10 @@ public class CourseSchedulerService {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    private void callCornellEnrollmentAPI(String orgId, JsonNode rawContentData) {
+    private void callCornellEnrollmentAPI(String partnerCode, JsonNode rawContentData) {
         try {
-            log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(orgId);
+            log.info("CourseSchedulerService::callCornellEnrollmentAPI");
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             List<Object> contentJson = Collections.singletonList(entity.path("result").get("transformProgressJson").toString());
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             String extCourseId = transformData.get("courseid").asText();
@@ -67,7 +67,8 @@ public class CourseSchedulerService {
                 Long date = Long.valueOf(transformData.get("completedon").asText());
                 String formatedDate = updateDateFormatFromTimestamp(date);
                 ((ObjectNode) transformData).put("completedon", formatedDate);
-                ((ObjectNode) transformData).put("orgId", orgId);
+                ((ObjectNode) transformData).put("partnerCode", partnerCode);
+                ((ObjectNode) transformData).put("partnerId", entity.get("id").asText());
                 payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
                 kafkaProducer.push(cbServerProperties.getTopic(), transformData);
             } else {
@@ -128,9 +129,9 @@ public class CourseSchedulerService {
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
         requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
-        requestBodyDTO.setVendorOrgId("G00345");
+        requestBodyDTO.setPartnerCode("CORNELL");
         String requestBody = objectMapper.writeValueAsString(requestBodyDTO);
-        return performEnrollmentCall("eCornell", requestBody);
+        return performEnrollmentCall(requestBodyDTO.getPartnerCode(), requestBody);
     }
 
     private Map<String, String> formUrlMapForEnrollment() {
@@ -147,8 +148,8 @@ public class CourseSchedulerService {
         return urlMap;
     }
 
-    private JsonNode performEnrollmentCall(String providerName, String requestBody) {
-        log.info("calling service locator for getting {} enrollment list", providerName);
+    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+        log.info("calling service locator for getting {} enrollment list", partnerCode);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -164,7 +165,7 @@ public class CourseSchedulerService {
             JsonNode jsonData = jsonNode.path("responseData").get("enrollments");
             jsonData.forEach(
                     eachContentData -> {
-                        callCornellEnrollmentAPI(providerName, eachContentData);
+                        callCornellEnrollmentAPI(partnerCode, eachContentData);
                     });
             return jsonData;
         } else {
