@@ -85,17 +85,19 @@ public class CiosContentServiceImpl implements CiosContentService {
         try {
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             log.info("No.of processedData from excel: " + processedData.size());
-            JsonNode jsonData = objectMapper.valueToTree(processedData);
+            int batchSize = 500;
+            List<List<Map<String, String>>> batches = splitIntoBatches(processedData, batchSize);
+            for (List<Map<String, String>> batch : batches) {
+                Map<String, Object> batchDataMap = new HashMap<>();
+                batchDataMap.put(Constants.PARTNER_CODE, partnerCode);
+                batchDataMap.put(Constants.FILE_NAME, fileName);
+                batchDataMap.put(Constants.INITIATED_ON, initiatedOn);
+                batchDataMap.put(Constants.FILE_ID, fileId);
+                batchDataMap.put("data", batch);
 
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("trasformContentJson"), new TypeReference<List<Object>>() {
-            });
-            if (contentJson == null || contentJson.isEmpty()) {
-                throw new CiosContentException("Transformation data not present in content partner db", HttpStatus.INTERNAL_SERVER_ERROR);
+                kafkaProducer.push(cbServerProperties.getCiosContentOnboardTopic(), batchDataMap);
+                log.info("Batch of size {} sent to Kafka", batch.size());
             }
-            processRowsAndCreateLogs(processedData, entity, fileId, fileName, initiatedOn,partnerCode);
-            ContentPartnerPluginService service = contentPartnerServiceFactory.getContentPartnerPluginService(contentSource);
-            service.loadContentFromExcel(jsonData, partnerCode, fileName, fileId, contentJson);
         } catch (Exception e) {
             JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED, null);
@@ -243,7 +245,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         return service.updateContent(jsonNode, partnerCode);
     }
 
-    private void processRowsAndCreateLogs(List<Map<String, String>> processedData, JsonNode entity, String fileId, String fileName, Timestamp initiatedOn, String partnerCode) throws IOException {
+    public void processRowsAndCreateLogs(List<Map<String, String>> processedData, JsonNode entity, String fileId, String fileName, Timestamp initiatedOn, String partnerCode) throws IOException {
         log.info("Starting row validation and log generation for file: {}", fileName);
         List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
         List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
@@ -331,4 +333,14 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
         return escapedValue;
     }
+
+    private List<List<Map<String, String>>> splitIntoBatches(List<Map<String, String>> data, int batchSize) {
+        List<List<Map<String, String>>> batches = new ArrayList<>();
+        for (int i = 0; i < data.size(); i += batchSize) {
+            int end = Math.min(data.size(), i + batchSize);
+            batches.add(data.subList(i, end));
+        }
+        return batches;
+    }
+
 }
