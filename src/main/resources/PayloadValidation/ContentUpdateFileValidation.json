@@ -145,7 +145,10 @@
           }
         },
         "contentSearchTags": {
-          "type": "keyword"
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
