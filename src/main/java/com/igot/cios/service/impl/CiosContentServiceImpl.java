@@ -93,6 +93,7 @@ public class CiosContentServiceImpl implements CiosContentService {
                 batchDataMap.put(Constants.FILE_NAME, fileName);
                 batchDataMap.put(Constants.INITIATED_ON, initiatedOn);
                 batchDataMap.put(Constants.FILE_ID, fileId);
+                batchDataMap.put(Constants.PARTNER_ID, partnerId);
                 batchDataMap.put("data", batch);
 
                 kafkaProducer.push(cbServerProperties.getCiosContentOnboardTopic(), batchDataMap);

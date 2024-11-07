@@ -95,7 +95,7 @@ public class Constants {
     public static final String FILE_NAME = "fileName";
     public static final String INITIATED_ON = "initiatedOn";
     public static final String CONTENT_UPLOAD_IN_PROGRESS = "InProgress";
-
+    public static final String PARTNER_ID = "partnerId";
 
 
     private Constants() {
