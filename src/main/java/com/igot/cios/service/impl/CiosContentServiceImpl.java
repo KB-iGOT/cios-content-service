@@ -246,33 +246,43 @@ public class CiosContentServiceImpl implements CiosContentService {
         return service.updateContent(jsonNode, partnerCode);
     }
 
-    public void processRowsAndCreateLogs(List<Map<String, String>> processedData, JsonNode entity, String fileId, String fileName, Timestamp initiatedOn, String partnerCode) throws IOException {
+    public void processRowsAndCreateLogs(List<Map<String, String>> processedData, String partnerId, String fileId, String fileName, Timestamp initiatedOn, String partnerCode, String loadContentErrorMessage) throws IOException {
         log.info("Starting row validation and log generation for file: {}", fileName);
         List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
         List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
         boolean hasFailures = false;
         String schemaFilePath = dataTransformUtility.getSchemaFilePathForPartner(partnerCode);
-        for (Map<String, String> row : processedData) {
-            LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
-            List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, schemaFilePath);
-            if (validationErrors.isEmpty()) {
-                linkedRow.put(Constants.STATUS, Constants.SUCCESS);
-                linkedRow.put("error", "");
-                successLogs.add(linkedRow);
-            } else {
-                linkedRow.put(Constants.STATUS, Constants.FAILED);
-                linkedRow.put("error", String.join(", ", validationErrors));
-                errorLogs.add(linkedRow);
-                hasFailures = true;
-                log.warn("Validation failed for row: {}. Errors: {}", row, validationErrors);
+        if (loadContentErrorMessage != null) {
+            LinkedHashMap<String, String> loadContentErrorLog = new LinkedHashMap<>();
+            loadContentErrorLog.put(Constants.FILE_ID, fileId);
+            loadContentErrorLog.put(Constants.FILE_NAME, fileName);
+            loadContentErrorLog.put(Constants.STATUS, Constants.FAILED);
+            loadContentErrorLog.put("error", loadContentErrorMessage);
+            errorLogs.add(loadContentErrorLog);
+            hasFailures = true;
+        } else {
+            for (Map<String, String> row : processedData) {
+                LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
+                List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, schemaFilePath);
+                if (validationErrors.isEmpty()) {
+                    linkedRow.put(Constants.STATUS, Constants.SUCCESS);
+                    linkedRow.put("error", "");
+                    successLogs.add(linkedRow);
+                } else {
+                    linkedRow.put(Constants.STATUS, Constants.FAILED);
+                    linkedRow.put("error", String.join(", ", validationErrors));
+                    errorLogs.add(linkedRow);
+                    hasFailures = true;
+                    log.warn("Validation failed for row: {}. Errors: {}", row, validationErrors);
+                }
             }
         }
         List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>();
         combinedLogs.addAll(successLogs);
         combinedLogs.addAll(errorLogs);
         String logFileName = fileName + "_" + partnerCode;
-        File logFile= writeLogsToFile(combinedLogs, logFileName);
-        SBApiResponse uploadedGCPFileResponse = storeFileToGCP.uploadCiosLogsFile(logFile,cbServerProperties.getCiosCloudContainerName(), cbServerProperties.getCiosFileLogsCloudFolderName());
+        File logFile = writeLogsToFile(combinedLogs, logFileName);
+        SBApiResponse uploadedGCPFileResponse = storeFileToGCP.uploadCiosLogsFile(logFile, cbServerProperties.getCiosCloudContainerName(), cbServerProperties.getCiosFileLogsCloudFolderName());
         String uploadedGCPFileName = "";
         if (uploadedGCPFileResponse.getParams().getStatus().equals(Constants.SUCCESS)) {
             uploadedGCPFileName = uploadedGCPFileResponse.getResult().get(Constants.NAME).toString();
@@ -283,10 +293,10 @@ public class CiosContentServiceImpl implements CiosContentService {
         Timestamp completedOn = new Timestamp(System.currentTimeMillis());
         if (hasFailures) {
             log.info("Marking file: {} as failed due to validation errors", fileName);
-            dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_FAILED, uploadedGCPFileName);
+            dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_FAILED, uploadedGCPFileName);
         } else {
             log.info("Marking file: {} as successful, no validation errors found", fileName);
-            dataTransformUtility.createFileInfo(entity.path(Constants.RESULT).get(Constants.ID).asText(), fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY, uploadedGCPFileName);
+            dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY, uploadedGCPFileName);
         }
     }
 
