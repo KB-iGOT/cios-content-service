@@ -43,6 +43,7 @@ public class OnboardContentConsumer {
         Timestamp initiatedOn = null;
         String fileId = null;
         String loadContentErrorMessage = null;
+
         try {
             log.info("Consuming the content to onboard in cios");
             Map<String, Object> receivedMessage = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
@@ -52,6 +53,7 @@ public class OnboardContentConsumer {
             initiatedOn = objectMapper.convertValue(receivedMessage.get(Constants.INITIATED_ON), Timestamp.class);
             fileId = (String) receivedMessage.get(Constants.FILE_ID);
             partnerId = (String) receivedMessage.get(Constants.PARTNER_ID);
+
             log.info("Received {} records from Kafka", receivedMessage.size());
             List<Map<String, String>> processedData = objectMapper.convertValue(receivedMessage.get("data"), new TypeReference<List<Map<String, String>>>() {});
             try {
