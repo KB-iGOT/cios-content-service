@@ -321,8 +321,6 @@ public class CiosContentServiceImpl implements CiosContentService {
         List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
         List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
         boolean hasFailures = false;
-        JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-        JsonNode contentJson = response.path(Constants.RESULT).path("");
         if (loadContentErrorMessage != null) {
             LinkedHashMap<String, String> loadContentErrorLog = new LinkedHashMap<>();
             loadContentErrorLog.put(Constants.FILE_ID, fileId);
@@ -332,9 +330,15 @@ public class CiosContentServiceImpl implements CiosContentService {
             errorLogs.add(loadContentErrorLog);
             hasFailures = true;
         } else {
+            JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
+            JsonNode fileValidation = response.path(Constants.RESULT).path("contentFileValidation");
+            if(fileValidation.isMissingNode()){
+                log.error("contentFileValidation is missing, please update in contentPartner");
+                throw new CiosContentException("ERROR","contentFileValidation is missing, please update in contentPartner",HttpStatus.INTERNAL_SERVER_ERROR);
+            }
             for (Map<String, String> row : processedData) {
                 LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
-                List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, contentJson);
+                List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, fileValidation);
                 if (validationErrors.isEmpty()) {
                     linkedRow.put(Constants.STATUS, Constants.SUCCESS);
                     linkedRow.put("error", "");

@@ -3,11 +3,13 @@ package com.igot.cios.consumer;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.service.impl.CiosContentServiceImpl;
 import com.igot.cios.util.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
@@ -69,6 +71,10 @@ public class OnboardContentConsumer {
         JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
         List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("trasformContentJson"), new TypeReference<List<Object>>() {
         });
+        if(contentJson == null || contentJson.isEmpty()){
+            log.error("trasformContentJson is missing, please update in contentPartner");
+            throw new CiosContentException("ERROR","trasformContentJson is missing, please update in contentPartner", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
         dataTransformUtility.updateProcessedDataInDb(jsonData, partnerCode, fileName, fileId, contentJson,partnerId);
     }
 
