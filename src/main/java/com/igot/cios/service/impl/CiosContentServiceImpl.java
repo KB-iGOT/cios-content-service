@@ -13,7 +13,6 @@ import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
-import com.igot.cios.plugins.ContentPartnerPluginService;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.repository.FileInfoRepository;
@@ -36,6 +35,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -77,15 +77,23 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public void loadContentFromExcel(MultipartFile file, String partnerCode, String partnerId) {
         log.info("CiosContentServiceImpl::loadContentFromExcel");
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
         String fileId = dataTransformUtility.createFileInfo(partnerId, null, fileName, initiatedOn, null, Constants.CONTENT_UPLOAD_IN_PROGRESS , null);
         try {
+            StopWatch processFileStopWatch = new StopWatch();
+            processFileStopWatch.start();
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
+            processFileStopWatch.stop();
+            log.info("Time taken for processExcelFile: {} ms", processFileStopWatch.getTotalTimeMillis());
             log.info("No.of processedData from excel: " + processedData.size());
             int batchSize = 500;
             List<List<Map<String, String>>> batches = splitIntoBatches(processedData, batchSize);
-            for (List<Map<String, String>> batch : batches) {
+            int totalBatches = batches.size();
+            for (int i = 0; i < batches.size(); i++) {
+                List<Map<String, String>> batch = batches.get(i);
                 Map<String, Object> batchDataMap = new HashMap<>();
                 batchDataMap.put(Constants.PARTNER_CODE, partnerCode);
                 batchDataMap.put(Constants.FILE_NAME, fileName);
@@ -93,13 +101,21 @@ public class CiosContentServiceImpl implements CiosContentService {
                 batchDataMap.put(Constants.FILE_ID, fileId);
                 batchDataMap.put(Constants.PARTNER_ID, partnerId);
                 batchDataMap.put("data", batch);
-
+                boolean isLastBatch = (i == totalBatches - 1);
+                if (isLastBatch) {
+                    log.info("This is the last batch of size {} for fileId {}", batch.size(), fileId);
+                    batchDataMap.put("isLastBatch", isLastBatch);
+                }
                 kafkaProducer.push(cbServerProperties.getCiosContentOnboardTopic(), batchDataMap);
                 log.info("Batch of size {} sent to Kafka", batch.size());
             }
         } catch (Exception e) {
             dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED, null);
             throw new RuntimeException(e.getMessage());
+        }finally {
+            // Stop the stopwatch and log the total time taken
+            stopWatch.stop();
+            log.info("Total time taken to execute loadContentFromExcel: {} ms", stopWatch.getTotalTimeMillis());
         }
     }
 
@@ -316,11 +332,23 @@ public class CiosContentServiceImpl implements CiosContentService {
         return transformData;
     }
 
-    public void processRowsAndCreateLogs(List<Map<String, String>> processedData, String partnerId, String fileId, String fileName, Timestamp initiatedOn, String partnerCode, String loadContentErrorMessage) throws IOException {
+    public Map<String, Object> processRowsAndCreateLogs(
+            List<Map<String, String>> processedData,
+            String fileId,
+            String fileName,
+            String partnerCode,
+            String loadContentErrorMessage) throws IOException {
+
         log.info("Starting row validation and log generation for file: {}", fileName);
+
         List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
         List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
+        List<Map<String, String>> successProcessedData = new ArrayList<>();
         boolean hasFailures = false;
+
+        JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
+        JsonNode fileValidation = response.path(Constants.RESULT).path("contentFileValidation");
+
         if (loadContentErrorMessage != null) {
             LinkedHashMap<String, String> loadContentErrorLog = new LinkedHashMap<>();
             loadContentErrorLog.put(Constants.FILE_ID, fileId);
@@ -330,19 +358,15 @@ public class CiosContentServiceImpl implements CiosContentService {
             errorLogs.add(loadContentErrorLog);
             hasFailures = true;
         } else {
-            JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            JsonNode fileValidation = response.path(Constants.RESULT).path("contentFileValidation");
-            if(fileValidation.isMissingNode()){
-                log.error("contentFileValidation is missing, please update in contentPartner");
-                throw new CiosContentException("ERROR","contentFileValidation is missing, please update in contentPartner",HttpStatus.INTERNAL_SERVER_ERROR);
-            }
             for (Map<String, String> row : processedData) {
                 LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
                 List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, fileValidation);
+
                 if (validationErrors.isEmpty()) {
                     linkedRow.put(Constants.STATUS, Constants.SUCCESS);
                     linkedRow.put("error", "");
                     successLogs.add(linkedRow);
+                    successProcessedData.add(row);
                 } else {
                     linkedRow.put(Constants.STATUS, Constants.FAILED);
                     linkedRow.put("error", String.join(", ", validationErrors));
@@ -352,27 +376,20 @@ public class CiosContentServiceImpl implements CiosContentService {
                 }
             }
         }
-        List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>();
-        combinedLogs.addAll(successLogs);
+
+        List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>(successLogs);
         combinedLogs.addAll(errorLogs);
-        String logFileName = fileName + "_" + partnerCode;
+
+        // Write logs to a local file
+        String logFileName = fileName + "_" + partnerCode + "_log.txt";
         File logFile = writeLogsToFile(combinedLogs, logFileName);
-        SBApiResponse uploadedGCPFileResponse = storeFileToGCP.uploadCiosLogsFile(logFile, cbServerProperties.getCiosCloudContainerName(), cbServerProperties.getCiosFileLogsCloudFolderName());
-        String uploadedGCPFileName = "";
-        if (uploadedGCPFileResponse.getParams().getStatus().equals(Constants.SUCCESS)) {
-            uploadedGCPFileName = uploadedGCPFileResponse.getResult().get(Constants.NAME).toString();
-            log.info("Log file uploaded successfully. File URL: {}", uploadedGCPFileName);
-        } else {
-            log.error("Failed to upload log file. Error message: {}", uploadedGCPFileResponse.getParams().getErrmsg());
-        }
-        Timestamp completedOn = new Timestamp(System.currentTimeMillis());
-        if (hasFailures) {
-            log.info("Marking file: {} as failed due to validation errors", fileName);
-            dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_FAILED, uploadedGCPFileName);
-        } else {
-            log.info("Marking file: {} as successful, no validation errors found", fileName);
-            dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, Constants.CONTENT_UPLOAD_SUCCESSFULLY, uploadedGCPFileName);
-        }
+        log.info("Log file created locally at: {}", logFile.getAbsolutePath());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("successProcessedData", successProcessedData);
+        result.put("logFile", logFile);
+        result.put("hasFailures", hasFailures);
+        return result;
     }
 
     private File writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
@@ -427,6 +444,24 @@ public class CiosContentServiceImpl implements CiosContentService {
             batches.add(data.subList(i, end));
         }
         return batches;
+    }
+
+    public void uploadLogFileToGCP(File logFile, String partnerId, String fileId, String fileName, Timestamp initiatedOn, boolean hasFailures) throws IOException {
+        log.info("consumeMessage::uploadLogFileToGCP:uploading file to GCP");
+        SBApiResponse uploadedGCPFileResponse = storeFileToGCP.uploadCiosLogsFile(
+                logFile,
+                cbServerProperties.getCiosCloudContainerName(),
+                cbServerProperties.getCiosFileLogsCloudFolderName());
+        String uploadedGCPFileName = "";
+        if (uploadedGCPFileResponse.getParams().getStatus().equals(Constants.SUCCESS)) {
+            uploadedGCPFileName = uploadedGCPFileResponse.getResult().get(Constants.NAME).toString();
+            log.info("Log file uploaded successfully. File URL: {}", uploadedGCPFileName);
+        } else {
+            log.error("Failed to upload log file. Error message: {}", uploadedGCPFileResponse.getParams().getErrmsg());
+        }
+        Timestamp completedOn = new Timestamp(System.currentTimeMillis());
+        String status = hasFailures ? Constants.CONTENT_UPLOAD_FAILED : Constants.CONTENT_UPLOAD_SUCCESSFULLY;
+        dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, status, uploadedGCPFileName);
     }
 
 }
