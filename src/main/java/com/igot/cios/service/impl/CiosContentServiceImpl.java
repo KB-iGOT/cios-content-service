@@ -77,16 +77,15 @@ public class CiosContentServiceImpl implements CiosContentService {
         SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CIOS_LOAD_EXCEL_CONTENT);
         String fileName = file.getOriginalFilename();
         Timestamp initiatedOn = new Timestamp(System.currentTimeMillis());
-        String fileId = dataTransformUtility.createFileInfo(partnerId, null, fileName, initiatedOn, null, Constants.CONTENT_UPLOAD_IN_PROGRESS , null);
         try {
             List<Map<String, String>> processedData = dataTransformUtility.processExcelFile(file);
             if(processedData == null || processedData.isEmpty()){
-                dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED, null);
                 response.getParams().setErrmsg(Constants.FILE_FORMAT_ERROR);
                 response.getParams().setStatus(Constants.FAILED);
                 response.setResponseCode(HttpStatus.BAD_REQUEST);
                 return response;
             }
+            String fileId = dataTransformUtility.createFileInfo(partnerId, null, fileName, initiatedOn, null, Constants.CONTENT_UPLOAD_IN_PROGRESS , null);
             log.info("No.of processedData from excel: " + processedData.size());
             int batchSize = 500;
             List<List<Map<String, String>>> batches = splitIntoBatches(processedData, batchSize);
@@ -104,7 +103,6 @@ public class CiosContentServiceImpl implements CiosContentService {
                 return response;
             }
         } catch (Exception e) {
-            dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, new Timestamp(System.currentTimeMillis()), Constants.CONTENT_UPLOAD_FAILED, null);
             response.getParams().setErrmsg(e.getMessage());
             response.getParams().setStatus(Constants.FAILED);
             response.setResponseCode(HttpStatus.BAD_REQUEST);
