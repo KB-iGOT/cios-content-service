@@ -305,7 +305,7 @@ public class DataTransformUtility {
         }
     }
 
-    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status, String GCPFileName) {
+    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status, String GCPFileName, int totalNumberOfContent, int processedNoOfContent) {
         log.info("CiosContentService:: createFileInfo: creating file information");
         FileInfoEntity fileInfoEntity = new FileInfoEntity();
         if (fileId == null) {
@@ -320,6 +320,8 @@ public class DataTransformUtility {
         fileInfoEntity.setStatus(status);
         fileInfoEntity.setPartnerId(partnerId);
         fileInfoEntity.setGCPFileName(GCPFileName);
+        fileInfoEntity.setTotalNoOfContent(totalNumberOfContent);
+        fileInfoEntity.setProcessedNoOfContent(processedNoOfContent);
         fileInfoRepository.save(fileInfoEntity);
         log.info("created successfully fileInfo {}", fileId);
         return fileId;
@@ -452,7 +454,6 @@ public class DataTransformUtility {
                         entityMap,
                         cbServerProperties.getElasticCiosContentJsonPath()
                 );
-                //log.info("Added data to ES document for externalId: {}", contentEntity.getExternalId());
             } catch (Exception e) {
                 log.error("Error while processing contentEntity with externalId: {}", contentEntity.getExternalId(), e);
             }

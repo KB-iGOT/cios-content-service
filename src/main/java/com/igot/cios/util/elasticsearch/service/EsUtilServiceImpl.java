@@ -59,7 +59,6 @@ public class EsUtilServiceImpl implements EsUtilService {
     @Override
     public RestStatus addDocument(
             String esIndexName, String type, String id, Map<String, Object> document, String JsonFilePath) {
-        log.info("EsUtilServiceImpl :: addDocument");
         try {
             JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
             InputStream schemaStream = schemaFactory.getClass().getResourceAsStream(JsonFilePath);
@@ -79,7 +78,6 @@ public class EsUtilServiceImpl implements EsUtilService {
                             .source(document, XContentType.JSON)
                             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
             IndexResponse response = elasticsearchClient.index(indexRequest, RequestOptions.DEFAULT);
-            log.info("EsUtilServiceImpl :: addDocument :Insertion response {}", response.status());
             return response.status();
         } catch (Exception e) {
             log.error("Issue while Indexing to es: {}", e.getMessage());

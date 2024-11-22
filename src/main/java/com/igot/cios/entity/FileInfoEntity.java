@@ -31,4 +31,8 @@ public class FileInfoEntity {
     private String partnerId;
 
     private String GCPFileName;
+
+    private int TotalNoOfContent;
+
+    private int ProcessedNoOfContent;
 }
