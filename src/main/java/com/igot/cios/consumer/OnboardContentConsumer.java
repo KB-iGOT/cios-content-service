@@ -93,7 +93,7 @@ public class OnboardContentConsumer {
 
 
     private void processReceivedData(String partnerCode, List<Map<String, String>> processedData, String fileName, String fileId, Timestamp initiatedOn,String partnerId) throws IOException {
-        log.info("Processing {} records for partner code {}", processedData.size(), partnerCode);
+        //log.info("Processing {} records for partner code {}", processedData.size(), partnerCode);
         JsonNode jsonData = objectMapper.valueToTree(processedData);
 
         JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
@@ -108,7 +108,7 @@ public class OnboardContentConsumer {
 
     private void handleErrorScenario(String fileId, String fileName, String partnerCode, String partnerId, Timestamp initiatedOn, String errorMessage, int totalNumberOfContent, int processedNoOfContent) {
         try {
-            Map<String, Object> errorResult = ciosContentServiceimpl.processRowsAndCreateLogs(null, fileId, fileName, partnerCode, errorMessage);
+             ciosContentServiceimpl.processRowsAndCreateLogs(null, fileId, fileName, partnerCode, errorMessage);
             handleLogFile(fileId, fileName, partnerId, initiatedOn, totalNumberOfContent, processedNoOfContent);
             log.info("Log file uploaded to GCP with failure status.");
         } catch (Exception logException) {

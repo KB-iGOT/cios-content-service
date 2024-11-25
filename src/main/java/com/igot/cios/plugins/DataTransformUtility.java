@@ -323,7 +323,7 @@ public class DataTransformUtility {
         fileInfoEntity.setTotalNoOfContent(totalNumberOfContent);
         fileInfoEntity.setProcessedNoOfContent(processedNoOfContent);
         fileInfoRepository.save(fileInfoEntity);
-        log.info("created successfully fileInfo {}", fileId);
+        //log.info("created successfully fileInfo {}", fileId);
         return fileId;
     }
 
@@ -459,7 +459,7 @@ public class DataTransformUtility {
             }
         });
         Long totalCourseCount = cornellContentRepository.countByPartnerCode(partnerCode);
-        log.info("Total courses onboarded {} for partner {}",totalCourseCount,partnerCode);
+        //log.info("Total courses onboarded {} for partner {}",totalCourseCount,partnerCode);
         JsonNode response = fetchPartnerInfoUsingApi(partnerCode);
         JsonNode resultData = response.path(Constants.RESULT);
         JsonNode data = resultData.path(Constants.DATA);

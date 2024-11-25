@@ -455,7 +455,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         String uploadedGCPFileName = "";
         if (uploadedGCPFileResponse.getParams().getStatus().equals(Constants.SUCCESS)) {
             uploadedGCPFileName = uploadedGCPFileResponse.getResult().get(Constants.NAME).toString();
-            log.info("Log file  successful uploaded to GCP, File URL: {}", uploadedGCPFileName);
+            //log.info("Log file  successful uploaded to GCP, File URL: {}", uploadedGCPFileName);
         } else {
             log.error("Failed to upload log file. Error message: {}", uploadedGCPFileResponse.getParams().getErrmsg());
         }
