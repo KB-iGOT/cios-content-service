@@ -83,7 +83,7 @@ public class CourseSchedulerService {
 
     private String updateDateFormatFromTimestamp(Long completedon) {
         Date date = new Date(completedon);
-        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
         return sdf.format(date);
     }
 
