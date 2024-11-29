@@ -9,8 +9,8 @@ import java.util.List;
 
 @Repository
 public interface FileLogInfoRepository extends JpaRepository<FileLogInfoEntity, String> {
-    //List<FileLogInfoEntity> findByFileId(String fileId);
+    List<FileLogInfoEntity> findByFileId(String fileId);
 
-//    @Transactional
-//    void deleteByFileId(String fileId);
+    @Transactional
+    void deleteByFileId(String fileId);
 }
