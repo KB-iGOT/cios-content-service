@@ -98,6 +98,11 @@ public class Constants {
     public static final String PARTNER_ID = "partnerId";
     public static final String API_CIOS_LOAD_EXCEL_CONTENT = "api.cios.load.excel.content";
     public static final String FILE_FORMAT_ERROR = "File format is not correct, Please upload valid file format";
+    public static final String LOCAL_BASE_PATH= "/tmp/";
+    public static final String CONTENT_FILE_VALIDATION = "contentFileValidation";
+    public static final String SUCCESS_PROCESSED_DATA = "successProcessedData";
+    public static final String LOG_FILE = "logFile";
+    public static final String HAS_FAILURES = "hasFailures";
 
 
     private Constants() {

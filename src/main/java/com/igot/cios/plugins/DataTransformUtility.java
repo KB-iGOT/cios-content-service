@@ -305,7 +305,7 @@ public class DataTransformUtility {
         }
     }
 
-    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status, String GCPFileName) {
+    public String createFileInfo(String partnerId, String fileId, String fileName, Timestamp initiatedOn, Timestamp completedOn, String status, String GCPFileName, String contentUploadedGCPFileName) {
         log.info("CiosContentService:: createFileInfo: creating file information");
         FileInfoEntity fileInfoEntity = new FileInfoEntity();
         if (fileId == null) {
@@ -320,6 +320,7 @@ public class DataTransformUtility {
         fileInfoEntity.setStatus(status);
         fileInfoEntity.setPartnerId(partnerId);
         fileInfoEntity.setGCPFileName(GCPFileName);
+        fileInfoEntity.setContentUploadedGCPFileName(contentUploadedGCPFileName);
         fileInfoRepository.save(fileInfoEntity);
         log.info("created successfully fileInfo {}", fileId);
         return fileId;

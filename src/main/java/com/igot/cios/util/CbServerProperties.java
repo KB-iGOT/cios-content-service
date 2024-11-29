@@ -70,4 +70,7 @@ public class CbServerProperties {
 
     @Value("${kafka.topic.content.onboarding}")
     private String ciosContentOnboardTopic;
+
+    @Value("${cios.content.cloud.folder.name}")
+    private String ciosContentFileCloudFolderName;
 }
