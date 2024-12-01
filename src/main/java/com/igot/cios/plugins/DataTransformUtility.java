@@ -14,6 +14,8 @@ import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.repository.FileInfoRepository;
+import com.igot.cios.service.impl.CiosContentServiceImpl;
+import com.igot.cios.storage.StoreFileToGCP;
 import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.elasticsearch.service.EsUtilService;
@@ -64,6 +66,12 @@ public class DataTransformUtility {
 
     @Autowired
     private CornellContentRepository cornellContentRepository;
+
+    @Autowired
+    private StoreFileToGCP storeFileToGCP;
+
+    @Autowired
+    private CiosContentServiceImpl ciosContentServiceimpl;
 
     private List<Map<String, String>> processSheetAndSendMessage(Sheet sheet) {
         log.info("CiosContentServiceImpl::processSheetAndSendMessage");
@@ -324,26 +332,6 @@ public class DataTransformUtility {
         fileInfoRepository.save(fileInfoEntity);
         log.info("created successfully fileInfo {}", fileId);
         return fileId;
-    }
-
-    public List<String> validateRowData(Map<String, String> row, String schemaFilePath) {
-        List<String> invalidErrList = new ArrayList<>();
-        try {
-            JsonNode rowNode = objectMapper.convertValue(row, JsonNode.class);
-            JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
-            InputStream schemaStream = getClass().getResourceAsStream(schemaFilePath);
-            JsonSchema schema = schemaFactory.getSchema(schemaStream);
-            if (rowNode.isArray()) {
-                for (JsonNode objectNode : rowNode) {
-                    validateRowDataObject(schema, objectNode, invalidErrList);
-                }
-            } else {
-                validateRowDataObject(schema, rowNode, invalidErrList);
-            }
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException(e);
-        }
-        return invalidErrList;
     }
 
     public List<String> validateRowData(Map<String, String> row, JsonNode schemaNode) {

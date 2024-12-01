@@ -8,12 +8,12 @@ import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.FileInfoRepository;
-import com.igot.cios.repository.FileLogInfoRepository;
 import com.igot.cios.service.impl.CiosContentServiceImpl;
 import com.igot.cios.storage.StoreFileToGCP;
 import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
@@ -32,15 +32,13 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 @Slf4j
 public class OnboardContentConsumer {
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    DataTransformUtility dataTransformUtility;
 
     @Autowired
     private CiosContentServiceImpl ciosContentServiceimpl;
@@ -52,13 +50,29 @@ public class OnboardContentConsumer {
     private StoreFileToGCP storeFileToGCP;
 
     @Autowired
-    private FileLogInfoRepository fileLogInfoRepository;
+    private CbServerProperties cbServerProperties;
 
     @Autowired
-    private CbServerProperties cbServerProperties;
+    DataTransformUtility dataTransformUtility;
 
     @KafkaListener(topics = "${kafka.topic.content.onboarding}", groupId = "${content.onboarding.consumer.group}")
     public void consumeMessage(String message) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                log.info("Received message to process: {}", message);
+                if (StringUtils.isNoneBlank(message)) {
+                    // Call the asynchronous processing method
+                    processOnboardingContent(message);
+                } else {
+                    log.error("Error in consuming message: Invalid content");
+                }
+            } catch (Exception e) {
+                log.error("Error in consumeMessage: {}", e.getMessage(), e);
+            }
+        });
+    }
+
+    public void processOnboardingContent(String message) {
         String contentUploadedGCPFileName = null;
         Path tmpPath = null;
         String loadContentErrorMessage = null;
@@ -67,11 +81,13 @@ public class OnboardContentConsumer {
         String partnerCode = null;
         String partnerId = null;
         Timestamp initiatedOn = null;
+
         try {
             log.info("Consuming the content to onboard in cios");
             Map<String, Object> receivedMessage = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {
             });
             log.info("Received {} records from Kafka", receivedMessage.size());
+
             partnerCode = (String) receivedMessage.get(Constants.PARTNER_CODE);
             fileName = (String) receivedMessage.get(Constants.FILE_NAME);
             initiatedOn = objectMapper.convertValue(receivedMessage.get(Constants.INITIATED_ON), Timestamp.class);
@@ -117,8 +133,7 @@ public class OnboardContentConsumer {
                 log.info("No successful data to process for partner: {}", partnerCode);
             }
             uploadLogFileToGCP(logFile, partnerId, fileId, fileName, initiatedOn, hasFailures, contentUploadedGCPFileName);
-            log.info("Log file  successful uploaded to GCP for partner: {}", partnerCode);
-//            handleLogFile(fileId, fileName, partnerId, initiatedOn, contentUploadedGCPFileName);
+            log.info("Log file successfully uploaded to GCP for partner: {}", partnerCode);
         } catch (Exception e) {
             loadContentErrorMessage = "Error in processReceivedData: " + e.getMessage();
             log.error(loadContentErrorMessage, e);
@@ -133,7 +148,6 @@ public class OnboardContentConsumer {
             } catch (Exception logException) {
                 log.error("Error while generating or uploading error logs for partner: {}", partnerCode, logException);
             }
-            //handleErrorScenario(fileId, fileName, partnerCode, partnerId, initiatedOn, loadContentErrorMessage, contentUploadedGCPFileName);
         } finally {
             if (tmpPath != null && Files.exists(tmpPath)) {
                 try {
@@ -144,7 +158,6 @@ public class OnboardContentConsumer {
             }
         }
     }
-
 
     private void processReceivedData(String partnerCode, List<Map<String, String>> processedData, String fileName, String fileId, Timestamp initiatedOn, String partnerId) throws IOException {
         log.info("Processing {} records for partner code {}", processedData.size(), partnerCode);
@@ -159,38 +172,6 @@ public class OnboardContentConsumer {
         }
         dataTransformUtility.updateProcessedDataInDb(jsonData, partnerCode, fileName, fileId, contentJson, partnerId);
     }
-
-   /* private void handleErrorScenario(String fileId, String fileName, String partnerCode, String partnerId, Timestamp initiatedOn, String errorMessage, String contentUploadedGCPFileName) {
-        try {
-            ciosContentServiceimpl.processRowsAndCreateLogs(null, fileId, fileName, partnerCode, errorMessage);
-            handleLogFile(fileId, fileName, partnerId, initiatedOn, contentUploadedGCPFileName);
-            log.info("Log file uploaded to GCP with failure status.");
-        } catch (Exception logException) {
-            log.error("Error while generating or uploading error logs for fileId: {}", fileId, logException);
-        }
-    }
-
-    private void handleLogFile(String fileId, String fileName, String partnerId, Timestamp initiatedOn, String contentUploadedGCPFileName) throws IOException {
-        List<FileLogInfoEntity> logEntities = fileLogInfoRepository.findByFileId(fileId);
-        if (logEntities.isEmpty()) {
-            log.warn("No logs found for fileId: {}", fileId);
-            return;
-        }
-        boolean isFailed = false;
-        List<LinkedHashMap<String, String>> logs = new ArrayList<>();
-        for (FileLogInfoEntity entity : logEntities) {
-            if (entity.isHasFailure()) {
-                isFailed = entity.isHasFailure();
-            }
-            LinkedHashMap<String, String> logData = objectMapper.convertValue(entity.getLogData(), new TypeReference<LinkedHashMap<String, String>>() {
-            });
-            logs.add(logData);
-        }
-
-        File logFile = ciosContentServiceimpl.writeLogsToFile(logs, fileName);
-        uploadLogFileToGCP(logFile, partnerId, fileId, fileName, initiatedOn, isFailed, contentUploadedGCPFileName);
-        log.info("Log file  successful uploaded to GCP for partner: {}", partnerId);
-    }*/
 
     public void uploadLogFileToGCP(File logFile, String partnerId, String fileId, String fileName, Timestamp initiatedOn, boolean hasFailures, String contentUploadedGCPFileName) throws IOException {
         log.info("consumeMessage::uploadLogFileToGCP:uploading file to GCP");
@@ -207,8 +188,5 @@ public class OnboardContentConsumer {
         Timestamp completedOn = new Timestamp(System.currentTimeMillis());
         String status = hasFailures ? Constants.CONTENT_UPLOAD_FAILED : Constants.CONTENT_UPLOAD_SUCCESSFULLY;
         dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, status, uploadedGCPFileName, contentUploadedGCPFileName);
-//        fileLogInfoRepository.deleteByFileId(fileId);
     }
-
-
 }

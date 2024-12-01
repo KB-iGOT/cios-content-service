@@ -11,13 +11,11 @@ import com.igot.cios.dto.RequestDto;
 import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.FileInfoEntity;
-import com.igot.cios.entity.FileLogInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.repository.FileInfoRepository;
-import com.igot.cios.repository.FileLogInfoRepository;
 import com.igot.cios.service.CiosContentService;
 import com.igot.cios.storage.StoreFileToGCP;
 import com.igot.cios.util.CbServerProperties;
@@ -74,8 +72,6 @@ public class CiosContentServiceImpl implements CiosContentService {
     private StoreFileToGCP storeFileToGCP;
     @Autowired
     private CbServerProperties cbServerProperties;
-    @Autowired
-    private FileLogInfoRepository fileLogInfoRepository;
 
     @Override
     public SBApiResponse loadContentFromExcel(MultipartFile file, String partnerCode, String partnerId) {
@@ -343,52 +339,6 @@ public class CiosContentServiceImpl implements CiosContentService {
         return transformData;
     }
 
-   /* public List<Map<String, String>> processRowsAndCreateLogs(
-            List<Map<String, String>> processedData,
-            String fileId,
-            String fileName,
-            String partnerCode,
-            String loadContentErrorMessage) throws IOException {
-
-        log.info("Starting row validation and log generation for file: {}", fileName);
-        List<Map<String, String>> successProcessedData = new ArrayList<>();
-        boolean hasFailures = false;
-
-        // Fetch partner info from API
-        JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-        JsonNode fileValidation = response.path(Constants.RESULT).path(Constants.CONTENT_FILE_VALIDATION);
-        if (fileValidation == null || fileValidation.isMissingNode()) {
-            log.error("File validation schema not found for partner: {}", partnerCode, response.toString());
-            throw new IOException("Validation schema missing for partner: " + partnerCode);
-        }
-        if (loadContentErrorMessage != null) {
-            Map<String, String> loadContentErrorLog = new HashMap<>();
-            loadContentErrorLog.put(Constants.FILE_ID, fileId);
-            loadContentErrorLog.put(Constants.FILE_NAME, fileName);
-            loadContentErrorLog.put(Constants.PARTNER_CODE, partnerCode);
-            loadContentErrorLog.put(Constants.STATUS, Constants.FAILED);
-            loadContentErrorLog.put("error", loadContentErrorMessage);
-            hasFailures = true;
-            saveLog(loadContentErrorLog, fileId, hasFailures);
-        }
-        for (Map<String, String> row : processedData) {
-            Map<String, String> logEntry = new HashMap<>(row);
-            List<String> validationErrors = dataTransformUtility.validateRowData(logEntry, fileValidation);
-
-            if (validationErrors.isEmpty()) {
-                logEntry.put(Constants.STATUS, Constants.SUCCESS);
-                logEntry.put("error", "");
-                successProcessedData.add(row);
-            } else {
-                logEntry.put(Constants.STATUS, Constants.FAILED);
-                logEntry.put("error", String.join(", ", validationErrors));
-                hasFailures = true;
-            }
-            saveLog(logEntry, fileId, hasFailures);
-        }
-        return successProcessedData;
-    }*/
-
     public Map<String, Object> processRowsAndCreateLogs(
             List<Map<String, String>> processedData,
             String fileId,
@@ -490,16 +440,6 @@ public class CiosContentServiceImpl implements CiosContentService {
             escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return escapedValue;
-    }
-
-    private void saveLog(Map<String, String> logData, String fileId, boolean hasFailures) {
-        JsonNode logJson = objectMapper.valueToTree(logData);
-        FileLogInfoEntity logInfoEntity = new FileLogInfoEntity();
-        logInfoEntity.setId(UUID.randomUUID().toString());
-        logInfoEntity.setFileId(fileId);
-        logInfoEntity.setLogData(logJson);
-        logInfoEntity.setHasFailure(hasFailures);
-        fileLogInfoRepository.save(logInfoEntity);
     }
 
     private boolean isValidFileFormat(String fileName) {
