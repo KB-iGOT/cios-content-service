@@ -103,6 +103,7 @@ public class Constants {
     public static final String SUCCESS_PROCESSED_DATA = "successProcessedData";
     public static final String LOG_FILE = "logFile";
     public static final String HAS_FAILURES = "hasFailures";
+    public static final long CACHE_EXPIRY_DURATION = 300000;
 
 
     private Constants() {

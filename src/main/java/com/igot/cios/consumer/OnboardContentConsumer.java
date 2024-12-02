@@ -55,6 +55,10 @@ public class OnboardContentConsumer {
     @Autowired
     DataTransformUtility dataTransformUtility;
 
+    private String cachedPartnerCode = null;
+    private List<Object> cachedContentJson = null;
+    private long cacheTimestamp = 0;
+
     @KafkaListener(topics = "${kafka.topic.content.onboarding}", groupId = "${content.onboarding.consumer.group}")
     public void consumeMessage(String message) {
         CompletableFuture.runAsync(() -> {
@@ -122,16 +126,10 @@ public class OnboardContentConsumer {
             }
 
             Map<String, Object> result = ciosContentServiceimpl.processRowsAndCreateLogs(
-                    processedData, fileId, fileName, partnerCode, null);
-
-            List<Map<String, String>> successProcessedData = (List<Map<String, String>>) result.get(Constants.SUCCESS_PROCESSED_DATA);
+                    processedData, fileId, fileName, partnerCode, null, partnerId);
             File logFile = (File) result.get(Constants.LOG_FILE);
             boolean hasFailures = (boolean) result.get(Constants.HAS_FAILURES);
-            if (successProcessedData != null && !successProcessedData.isEmpty()) {
-                processReceivedData(partnerCode, successProcessedData, fileName, fileId, initiatedOn, partnerId);
-            } else {
-                log.info("No successful data to process for partner: {}", partnerCode);
-            }
+
             uploadLogFileToGCP(logFile, partnerId, fileId, fileName, initiatedOn, hasFailures, contentUploadedGCPFileName);
             log.info("Log file successfully uploaded to GCP for partner: {}", partnerCode);
         } catch (Exception e) {
@@ -139,9 +137,9 @@ public class OnboardContentConsumer {
             log.error(loadContentErrorMessage, e);
             try {
                 Map<String, Object> errorResult = ciosContentServiceimpl.processRowsAndCreateLogs(
-                        null, fileId, fileName, partnerCode, loadContentErrorMessage);
+                        null, fileId, fileName, partnerCode, loadContentErrorMessage, partnerId);
 
-                File errorLogFile = (File) errorResult.get("logFile");
+                File errorLogFile = (File) errorResult.get(Constants.LOG_FILE);
                 boolean hasFailures = true;
                 uploadLogFileToGCP(errorLogFile, partnerId, fileId, fileName, initiatedOn, hasFailures, contentUploadedGCPFileName);
                 log.info("Log file uploaded to GCP with failure status for partner: {}", partnerCode);
@@ -159,18 +157,29 @@ public class OnboardContentConsumer {
         }
     }
 
-    private void processReceivedData(String partnerCode, List<Map<String, String>> processedData, String fileName, String fileId, Timestamp initiatedOn, String partnerId) throws IOException {
+    public void processReceivedData(String partnerCode, List<Map<String, String>> processedData, String fileName, String fileId, String partnerId) throws IOException {
         log.info("Processing {} records for partner code {}", processedData.size(), partnerCode);
         JsonNode jsonData = objectMapper.valueToTree(processedData);
-
-        JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-        List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("trasformContentJson"), new TypeReference<List<Object>>() {
-        });
-        if (contentJson == null || contentJson.isEmpty()) {
-            log.error("trasformContentJson is missing, please update in contentPartner");
-            throw new CiosContentException("ERROR", "trasformContentJson is missing, please update in contentPartner", HttpStatus.INTERNAL_SERVER_ERROR);
+        boolean isCacheExpired = System.currentTimeMillis() - cacheTimestamp > Constants.CACHE_EXPIRY_DURATION;
+        if (cachedPartnerCode == null || !cachedPartnerCode.equals(partnerCode) || isCacheExpired) {
+            JsonNode partnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
+            // Extract and cache contentJson
+            cachedContentJson = objectMapper.convertValue(
+                    partnerInfo.path(Constants.RESULT).path("trasformContentJson"),
+                    new TypeReference<List<Object>>() {
+                    }
+            );
+            if (cachedContentJson == null || cachedContentJson.isEmpty()) {
+                log.error("trasformContentJson is missing, please update in contentPartner");
+                throw new CiosContentException(
+                        "ERROR",
+                        "trasformContentJson is missing, please update in contentPartner",
+                        HttpStatus.INTERNAL_SERVER_ERROR
+                );
+            }
+            cachedPartnerCode = partnerCode;
         }
-        dataTransformUtility.updateProcessedDataInDb(jsonData, partnerCode, fileName, fileId, contentJson, partnerId);
+        dataTransformUtility.updateProcessedDataInDb(jsonData, partnerCode, fileName, fileId, cachedContentJson, partnerId);
     }
 
     public void uploadLogFileToGCP(File logFile, String partnerId, String fileId, String fileName, Timestamp initiatedOn, boolean hasFailures, String contentUploadedGCPFileName) throws IOException {

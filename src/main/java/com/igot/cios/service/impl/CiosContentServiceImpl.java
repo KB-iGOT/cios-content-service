@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.igot.cios.consumer.OnboardContentConsumer;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
@@ -72,6 +73,8 @@ public class CiosContentServiceImpl implements CiosContentService {
     private StoreFileToGCP storeFileToGCP;
     @Autowired
     private CbServerProperties cbServerProperties;
+    @Autowired
+    private OnboardContentConsumer onboardContentConsumer;
 
     @Override
     public SBApiResponse loadContentFromExcel(MultipartFile file, String partnerCode, String partnerId) {
@@ -344,12 +347,12 @@ public class CiosContentServiceImpl implements CiosContentService {
             String fileId,
             String fileName,
             String partnerCode,
-            String loadContentErrorMessage) throws IOException {
+            String loadContentErrorMessage,
+            String partnerId) throws IOException {
 
         log.info("Starting row validation and log generation for file: {}", fileName);
         List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
         List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
-        List<Map<String, String>> successProcessedData = new ArrayList<>();
         boolean hasFailures = false;
 
         JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
@@ -372,13 +375,13 @@ public class CiosContentServiceImpl implements CiosContentService {
                     linkedRow.put(Constants.STATUS, Constants.SUCCESS);
                     linkedRow.put("error", "");
                     successLogs.add(linkedRow);
-                    successProcessedData.add(row);
+                    List<Map<String, String>> successProcessedData = Collections.singletonList(row);
+                    onboardContentConsumer.processReceivedData(partnerCode, successProcessedData, fileName, fileId, partnerId);
                 } else {
                     linkedRow.put(Constants.STATUS, Constants.FAILED);
                     linkedRow.put("error", String.join(", ", validationErrors));
                     errorLogs.add(linkedRow);
                     hasFailures = true;
-                    log.warn("Validation failed for row: {}. Errors: {}", row, validationErrors);
                 }
             }
         }
@@ -391,7 +394,6 @@ public class CiosContentServiceImpl implements CiosContentService {
         log.info("Log file created locally at: {}", logFile.getAbsolutePath());
 
         Map<String, Object> result = new HashMap<>();
-        result.put("successProcessedData", successProcessedData);
         result.put("logFile", logFile);
         result.put("hasFailures", hasFailures);
         return result;
