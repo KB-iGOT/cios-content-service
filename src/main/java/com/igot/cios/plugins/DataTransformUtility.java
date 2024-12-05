@@ -135,13 +135,8 @@ public class DataTransformUtility {
                 for (String header : headers) {
                     String cellValue = csvRecord.get(header);
                     if (cellValue != null && !cellValue.trim().isEmpty()) {
-                        // Handle date format (assuming date is in a specific format)
-                        if (isDate(cellValue)) {
-                            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-                            cellValue = dateFormat.format(parseDate(cellValue));
-                        } else {
-                            cellValue = cellValue.replace("\n", ",").trim();
-                        }
+
+                        cellValue = cellValue.replace("\n", ",").trim();
                         allBlank = false;
                     }
                     rowData.put(header, cellValue);
