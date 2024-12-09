@@ -13,16 +13,30 @@ import org.springframework.stereotype.Component;
 public class CourseScheduler {
 
     @Autowired
-    CourseSchedulerService courseSchedulerService;
+    CornellSchedulerService cornellSchedulerService;
+
+    @Autowired
+    CourseraSchedulerService courseraSchedulerService;
 
     @Value("${scheduler.enabled}")
     private boolean schedulerEnabled;
 
+    @Value("${coursera.scheduler.enabled}")
+    private boolean courseraSchedulerEnabled;
+
     @Scheduled(cron = "${scheduler.cron}")
-    private void callEnrollmentApi() throws JsonProcessingException {
+    private void callCornellEnrollmentApi() throws JsonProcessingException{
         if (schedulerEnabled) {
-            log.info("CourseScheduler :: callEnrollmentApi");
-            courseSchedulerService.loadCornellEnrollment();
+            log.info("CourseScheduler :: callCornellEnrollmentApi");
+            cornellSchedulerService.loadEnrollment();
+        }
+    }
+
+    @Scheduled(cron = "${coursera.scheduler.cron}")
+    private void callCourseraEnrollmentApi() throws JsonProcessingException {
+        if (courseraSchedulerEnabled) {
+            log.info("CourseScheduler :: callCourseraEnrollmentApi");
+            courseraSchedulerService.loadEnrollment();
         }
     }
 }

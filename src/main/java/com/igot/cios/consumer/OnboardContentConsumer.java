@@ -166,12 +166,12 @@ public class OnboardContentConsumer {
             JsonNode partnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
             // Extract and cache contentJson
             cachedContentJson = objectMapper.convertValue(
-                    partnerInfo.path(Constants.RESULT).path("trasformContentJson"),
+                    partnerInfo.path("trasformContentJson"),
                     new TypeReference<List<Object>>() {
                     }
             );
             if (cachedContentJson == null || cachedContentJson.isEmpty()) {
-                log.error("trasformContentJson is missing, please update in contentPartner");
+                log.error("trasformContentJson is missing, please update in contentPartner for partner {}",partnerCode);
                 throw new CiosContentException(
                         "ERROR",
                         "trasformContentJson is missing, please update in contentPartner",

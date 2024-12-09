@@ -20,15 +20,18 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestTemplate;
-
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 @Slf4j
 @Service
-public class CourseSchedulerService {
+public class CornellSchedulerService implements SchedulerInterface {
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -45,14 +48,15 @@ public class CourseSchedulerService {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    private void callCornellEnrollmentAPI(String partnerCode, JsonNode rawContentData) {
+    public void callEnrollmentAPI(String partnerCode, JsonNode rawContentData) {
         try {
-            log.info("CourseSchedulerService::callCornellEnrollmentAPI");
+            log.info("CornellSchedulerService::callEnrollmentAPI");
             JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            List<Object> contentJson = Collections.singletonList(entity.path("result").get("transformProgressJson").toString());
+            List<Object> contentJson = objectMapper.convertValue(entity.get("transformProgressViaApi"), new TypeReference<List<Object>>() {});
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             String extCourseId = transformData.get("courseid").asText();
-            JsonNode result = callCiosReadApi(extCourseId);
+            String partnerId = entity.get("id").asText();
+            JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId,partnerId);
             String courseId = result.path("content").get("contentId").asText();
             String[] parts = transformData.get("userid").asText().split("@");
             ((ObjectNode) transformData).put("userid", parts[0]);
@@ -87,51 +91,17 @@ public class CourseSchedulerService {
         return sdf.format(date);
     }
 
-    private JsonNode callCiosReadApi(String extCourseId) {
-        log.info("CourseScheduler :: callCiosReadApi");
-        try {
-            String url = cbServerProperties.getCbPoresbaseUrl() + cbServerProperties.getFixedUrl() + extCourseId;
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            ResponseEntity<Object> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    entity,
-                    Object.class
-            );
-            if (response.getStatusCode().is2xxSuccessful()) {
-                JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
-                return jsonNode;
-            } else {
-                throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
-            }
-        } catch (Exception e) {
-            throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-    }
-
-    private JsonNode transformData(Object sourceObject, List<Object> specJson) {
-        log.debug("CiosContentServiceImpl::transformData");
-        try {
-            String inputJson = objectMapper.writeValueAsString(sourceObject);
-            Chainr chainr = Chainr.fromSpec(specJson);
-            Object transformedOutput = chainr.transform(JsonUtils.jsonToObject(inputJson));
-            return objectMapper.convertValue(transformedOutput, JsonNode.class);
-        } catch (JsonProcessingException e) {
-            log.error("Error transforming data", e);
-            return null;
-        }
-    }
-
-    public JsonNode loadCornellEnrollment() throws JsonProcessingException {
+    public JsonNode loadEnrollment() {
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
         requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
-        requestBodyDTO.setPartnerCode("CORNELL");
-        String requestBody = objectMapper.writeValueAsString(requestBodyDTO);
-        return performEnrollmentCall(requestBodyDTO.getPartnerCode(), requestBody);
+        String payload = null;
+        try {
+            payload = objectMapper.writeValueAsString(requestBodyDTO);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+        return performEnrollmentCall(cbServerProperties.cornellPartnerCode,payload);
     }
 
     private Map<String, String> formUrlMapForEnrollment() {
@@ -148,7 +118,7 @@ public class CourseSchedulerService {
         return urlMap;
     }
 
-    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+    public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("calling service locator for getting {} enrollment list", partnerCode);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
@@ -165,7 +135,7 @@ public class CourseSchedulerService {
             JsonNode jsonData = jsonNode.path("responseData").get("enrollments");
             jsonData.forEach(
                     eachContentData -> {
-                        callCornellEnrollmentAPI(partnerCode, eachContentData);
+                        callEnrollmentAPI(partnerCode, eachContentData);
                     });
             return jsonData;
         } else {

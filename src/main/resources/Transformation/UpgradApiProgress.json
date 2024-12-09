@@ -1,0 +1,10 @@
+[
+  {
+    "operation": "shift",
+    "spec": {
+      "student": "userid",
+      "course": "courseid",
+      "completion_date": "completedon"
+    }
+  }
+]
