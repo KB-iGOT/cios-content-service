@@ -214,11 +214,7 @@ public class DataTransformUtility {
         String url = cbServerProperties.getCbPoresbaseUrl() + cbServerProperties.getPartnerCreateEndPoint();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-
-        // Create the request entity with body and headers
         HttpEntity<Object> entity = new HttpEntity<>(jsonNode, headers);
-
-        // Make the POST request
         ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
         if (response.getStatusCode().is2xxSuccessful()) {
             return response.getBody();
@@ -229,7 +225,7 @@ public class DataTransformUtility {
 
 
     public JsonNode fetchPartnerInfoUsingApi(String partnerCode) {
-        log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerCode");
+        log.info("CiosContentServiceImpl::fetchPartnerInfoUsingApi:fetching partner data by partnerCode {}",partnerCode);
         String getApiUrl = cbServerProperties.getCbPoresbaseUrl() + cbServerProperties.getPartnerReadEndPoint() + partnerCode;
         Map<String, String> headers = new HashMap<>();
         Map<String, Object> readData = (Map<String, Object>) fetchResultUsingGet(getApiUrl, headers);
@@ -238,7 +234,7 @@ public class DataTransformUtility {
             throw new RuntimeException("Failed to get data from API: Response is null");
         }
         ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.convertValue(readData, JsonNode.class);
+        return objectMapper.convertValue(readData.get("result"), JsonNode.class);
     }
 
     public Object fetchResultUsingGet(String uri, Map<String, String> headersValues) {
@@ -459,6 +455,30 @@ public class DataTransformUtility {
                 entityMap.remove(Constants.CIOS_DATA);
                 entityMap.remove(Constants.SOURCE_DATA);
             }
+        }
+    }
+
+    public JsonNode callCiosReadApi(String extCourseId,String partnerId) {
+        log.info("CourseScheduler :: callCiosReadApi");
+        try {
+            String url = cbServerProperties.getCbPoresbaseUrl() + cbServerProperties.getFixedUrl() + extCourseId + "/" + partnerId;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<Object> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    Object.class
+            );
+            if (response.getStatusCode().is2xxSuccessful()) {
+                JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
+                return jsonNode;
+            } else {
+                throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
+            }
+        } catch (Exception e) {
+            throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

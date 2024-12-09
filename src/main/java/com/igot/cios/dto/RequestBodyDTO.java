@@ -12,5 +12,6 @@ import java.util.Map;
 public class RequestBodyDTO {
     private String serviceCode;
     private Map<String, String> urlMap;
-    private String partnerCode;
+    private Map<String, String> headerMap;
+    private Map<String, String> requestBody;
 }

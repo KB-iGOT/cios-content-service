@@ -1,0 +1,10 @@
+[
+  {
+    "operation": "shift",
+    "spec": {
+      "email": "userid",
+      "contentId": "courseid",
+      "completedAt": "completedon"
+    }
+  }
+]

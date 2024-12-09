@@ -1,0 +1,40 @@
+[
+  {
+    "spec": {
+      "responseData": {
+        "paging": {
+          "total": "totalCount"
+        },
+        "elements": {
+          "*": {
+            "name": "data[&1].name",
+            "programs": {
+              "*": {
+                "contentUrl": "data[&3].redirectUrl"
+              }
+            },
+            "contentId": "data[&1].externalId",
+            "description": "data[&1].description",
+            "extraMetadata": {
+              "definition": {
+                "tagline": "data[&3].topic",
+                "promoPhoto": "data[&3].appIcon"
+              }
+            }
+          }
+        }
+      }
+    },
+    "operation": "shift"
+  },
+  {
+    "spec": {
+      "data": {
+        "*": {
+          "redirectUrl": "=concat('https://www.coursera.org/programs/learning-program-4spdd?productId=', @(1,externalId), '&productType=Specialization&showMiniModal=true&attemptSSOLogin=true')"
+        }
+      }
+    },
+    "operation": "modify-overwrite-beta"
+  }
+]

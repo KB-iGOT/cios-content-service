@@ -8,7 +8,7 @@
       "Duration": "content.duration",
       "long description": "content.description",
       "imageUrl": "content.appIcon",
-      "redirectUrl": "content.redirectUrl"
+      "Redirection URL": "content.redirectUrl"
     }
   }
 ]
