@@ -2,9 +2,13 @@
   {
     "operation": "shift",
     "spec": {
-      "StudentId": "userid",
-      "LessonId": "courseid",
-      "completion_date": "completedon"
+      "enrollments": {
+        "*": {
+          "student": "[&1].userid",
+          "course": "[&1].courseid",
+          "completion_date": "[&1].completedon"
+        }
+      }
     }
   }
 ]

@@ -84,7 +84,7 @@ public class CbServerProperties {
     private String courseraEnrollmentServiceCode;
 
     @Value("${coursera.enrollment.list.limit}")
-    private String courseraEnrollmentListLimit;
+    private int courseraEnrollmentListLimit;
 
     @Value("${coursera.enrollment.list.course_type}")
     private String courseraEnrollmentListCourseType;

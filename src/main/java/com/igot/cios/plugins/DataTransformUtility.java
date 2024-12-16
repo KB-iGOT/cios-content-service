@@ -358,6 +358,14 @@ public class DataTransformUtility {
         processedData.forEach(eachContentData -> {
             JsonNode transformData = transformData(eachContentData, contentJson);
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            if (transformData != null &&
+                    transformData.path(Constants.CONTENT) != null &&
+                    transformData.path(Constants.CONTENT).get(Constants.DURATION) != null) {
+                String durationString = transformData.path(Constants.CONTENT).get(Constants.DURATION).textValue();
+                String[] parts = durationString.split(" ");
+                String duration = String.valueOf(Integer.parseInt(parts[0]));
+                ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.DURATION, duration).asText();
+            }
             ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.FILE_ID, fileId).asText();
             ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.SOURCE, fileName).asText();
             ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PARTNER_CODE, partnerCode).asText();
@@ -389,7 +397,7 @@ public class DataTransformUtility {
         Optional<CornellContentEntity> optExternalContent = cornellContentRepository.findByExternalIdAndPartnerId(externalId,partnerId);
         if (optExternalContent.isPresent()) {
             CornellContentEntity externalContent = optExternalContent.get();
-            if(!externalContent.getCiosData().get("content").get("status").equals("live")||externalContent.getCiosData().get("content").get("status").equals("draft")) {
+            if(!(externalContent.getCiosData().get("content").get("status").equals("live")||externalContent.getCiosData().get("content").get("status").equals("draft"))){
                 externalContent.setExternalId(externalId);
                 externalContent.setCiosData(transformData);
                 externalContent.setIsActive(externalContent.getIsActive());
@@ -399,6 +407,8 @@ public class DataTransformUtility {
                 externalContent.setFileId(fileId);
                 externalContent.setPartnerId(partnerId);
                 externalContent.setPartnerCode((partnerCode));
+            }else{
+                //kafka changes need to add
             }
             return externalContent;
         } else {
@@ -440,10 +450,9 @@ public class DataTransformUtility {
         Long totalCourseCount = cornellContentRepository.countByPartnerCode(partnerCode);
         log.info("Total courses onboarded {} for partner {}",totalCourseCount,partnerCode);
         JsonNode response = fetchPartnerInfoUsingApi(partnerCode);
-        JsonNode resultData = response.path(Constants.RESULT);
-        JsonNode data = resultData.path(Constants.DATA);
-        ((ObjectNode) data).put(Constants.TOTAL_COURSES_COUNT, totalCourseCount);
-        updatingPartnerInfo(resultData);
+        JsonNode resultData = response.path(Constants.DATA);
+        ((ObjectNode) resultData).put(Constants.TOTAL_COURSES_COUNT, totalCourseCount);
+        updatingPartnerInfo(response);
     }
 
     public void flattenContentData(Map<String, Object> entityMap) {
