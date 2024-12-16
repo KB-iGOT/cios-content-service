@@ -1,10 +1,19 @@
 [
   {
-    "operation": "shift",
     "spec": {
-      "email": "userid",
-      "contentId": "courseid",
-      "completedAt": "completedon"
-    }
+      "paging": {
+        "total": "count"
+      },
+      "elements": {
+        "*": {
+          "email": "data[&1].userid",
+          "contentId": "data[&1].courseid",
+          "enrolledAt": "data[&1].completedon",
+          "contentType": "data[&1].contentType",
+          "isCompleted": "data[&1].isCompleted"
+        }
+      }
+    },
+    "operation": "shift"
   }
 ]

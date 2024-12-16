@@ -48,14 +48,10 @@ public class CornellSchedulerService implements SchedulerInterface {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    public void callEnrollmentAPI(String partnerCode, JsonNode rawContentData) {
+    public void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CornellSchedulerService::callEnrollmentAPI");
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            List<Object> contentJson = objectMapper.convertValue(entity.get("transformProgressViaApi"), new TypeReference<List<Object>>() {});
-            JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             String extCourseId = transformData.get("courseid").asText();
-            String partnerId = entity.get("id").asText();
             JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId,partnerId);
             String courseId = result.path("content").get("contentId").asText();
             String[] parts = transformData.get("userid").asText().split("@");
@@ -72,7 +68,7 @@ public class CornellSchedulerService implements SchedulerInterface {
                 String formatedDate = updateDateFormatFromTimestamp(date);
                 ((ObjectNode) transformData).put("completedon", formatedDate);
                 ((ObjectNode) transformData).put("partnerCode", partnerCode);
-                ((ObjectNode) transformData).put("partnerId", entity.get("id").asText());
+                ((ObjectNode) transformData).put("partnerId", partnerId);
                 payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
                 kafkaProducer.push(cbServerProperties.getTopic(), transformData);
             } else {
@@ -131,12 +127,17 @@ public class CornellSchedulerService implements SchedulerInterface {
                 Object.class
         );
         if (response.getStatusCode().is2xxSuccessful()) {
-            JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
-            JsonNode jsonData = jsonNode.path("responseData").get("enrollments");
-            jsonData.forEach(
-                    eachContentData -> {
-                        callEnrollmentAPI(partnerCode, eachContentData);
-                    });
+            JsonNode jsonData = objectMapper.valueToTree(response.getBody());
+            if(!jsonData.isMissingNode()){
+                JsonNode contentPartnerResponse = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
+                String partnerId = contentPartnerResponse.get("id").asText();
+                jsonData.forEach(
+                        eachContentData -> {
+                            callEnrollmentAPI(partnerCode, partnerId, eachContentData);
+                        });
+            }else{
+                log.error("Failed to retrieve response data: for partner code {}", partnerCode);
+            }
             return jsonData;
         } else {
             throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
