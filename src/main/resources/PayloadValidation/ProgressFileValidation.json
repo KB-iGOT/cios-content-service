@@ -27,6 +27,5 @@
       "courseid",
       "completedon"
     ]
-  },
-  "additionalProperties": false
+  }
 }
