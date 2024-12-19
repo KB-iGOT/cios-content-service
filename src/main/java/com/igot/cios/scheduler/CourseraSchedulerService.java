@@ -47,6 +47,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
 
     @Override
     public JsonNode loadEnrollment() {
+        log.info("Coursera Scheduler Service::loadEnrollment()");
         int start = 0;
         int limit = cbServerProperties.getCourseraEnrollmentListLimit();
         String payload = null;
@@ -87,8 +88,8 @@ public class CourseraSchedulerService implements SchedulerInterface {
         Map<String, String> urlMap = new HashMap<>();
         urlMap.put("limit", String.valueOf(cbServerProperties.getCourseraEnrollmentListLimit()));
         urlMap.put("start", String.valueOf(start));
-        urlMap.put("completedAtBefore", String.valueOf(timestampWithoutMillis));
-        urlMap.put("completedAtAfter", String.valueOf(timestamp));
+        urlMap.put(cbServerProperties.getCourseraDateBefore(), String.valueOf(timestampWithoutMillis));
+        urlMap.put(cbServerProperties.getCourseraDateAfter(), String.valueOf(timestamp));
         return urlMap;
     }
 

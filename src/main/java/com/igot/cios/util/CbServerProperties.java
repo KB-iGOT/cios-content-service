@@ -91,4 +91,10 @@ public class CbServerProperties {
 
     @Value("${coursera.date.range}")
     private Long courseraDateRange;
+
+    @Value("${coursera.date.before}")
+    private String courseraDateBefore;
+
+    @Value("${coursera.date.after}")
+    private String courseraDateAfter;
 }
