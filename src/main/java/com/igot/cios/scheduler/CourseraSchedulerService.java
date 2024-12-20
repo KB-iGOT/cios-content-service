@@ -64,8 +64,8 @@ public class CourseraSchedulerService implements SchedulerInterface {
             }
             JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
             total = response.get("count").asInt();
-            JsonNode enrollmentData = response.get("data");
-            if (enrollmentData != null && enrollmentData.isArray()) {
+            JsonNode enrollmentData = response.path("data");
+            if (enrollmentData != null && !enrollmentData.isMissingNode() && enrollmentData.isArray()) {
                 allEnrollmentData.addAll((ArrayNode) enrollmentData);
             }
             start += limit;
@@ -111,7 +111,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
         if (response.getStatusCode().is2xxSuccessful()) {
             log.info("CourseraSchedulerService :: performEnrollmentCall response {}");
             JsonNode jsonData = objectMapper.valueToTree(response.getBody());
-            if(!jsonData.isMissingNode()){
+            if(!jsonData.isMissingNode()&&jsonData != null){
                 return jsonData;
             }else{
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);
