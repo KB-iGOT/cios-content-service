@@ -45,7 +45,7 @@ public class CourseraSchedulerService {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    public JsonNode loadEnrollment() {
+    public JsonNode loadCourseraEnrollment() {
         log.info("Coursera Scheduler Service::loadEnrollment()");
         int start = 0;
         int limit = cbServerProperties.getCourseraEnrollmentListLimit();

@@ -87,7 +87,7 @@ public class CornellSchedulerService{
         return sdf.format(date);
     }
 
-    public JsonNode loadEnrollment() {
+    public JsonNode loadCornellEnrollment() {
         log.info("CornellSchedulerService :: loadEnrollment()");
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
