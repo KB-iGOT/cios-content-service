@@ -84,11 +84,17 @@ public class CbServerProperties {
     private String courseraEnrollmentServiceCode;
 
     @Value("${coursera.enrollment.list.limit}")
-    private String courseraEnrollmentListLimit;
+    private int courseraEnrollmentListLimit;
 
     @Value("${coursera.enrollment.list.course_type}")
     private String courseraEnrollmentListCourseType;
 
     @Value("${coursera.date.range}")
     private Long courseraDateRange;
+
+    @Value("${coursera.date.before}")
+    private String courseraDateBefore;
+
+    @Value("${coursera.date.after}")
+    private String courseraDateAfter;
 }

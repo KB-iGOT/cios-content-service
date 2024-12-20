@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.RequestBodyDTO;
 import com.igot.cios.exception.CiosContentException;
@@ -46,19 +47,39 @@ public class CourseraSchedulerService implements SchedulerInterface {
 
     @Override
     public JsonNode loadEnrollment() {
-        RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
-        requestBodyDTO.setServiceCode(cbServerProperties.getCourseraEnrollmentServiceCode());
-        requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
+        log.info("Coursera Scheduler Service::loadEnrollment()");
+        int start = 0;
+        int limit = cbServerProperties.getCourseraEnrollmentListLimit();
         String payload = null;
-        try {
-            payload = objectMapper.writeValueAsString(requestBodyDTO);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+        ArrayNode allEnrollmentData = objectMapper.createArrayNode();
+        int total = 0;
+        while (start == 0 || start < total) {
+            RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
+            requestBodyDTO.setServiceCode(cbServerProperties.getCourseraEnrollmentServiceCode());
+            requestBodyDTO.setUrlMap(formUrlMapForEnrollment(start, limit));
+            try {
+                payload = objectMapper.writeValueAsString(requestBodyDTO);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+            JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
+            total = response.get("count").asInt();
+            JsonNode enrollmentData = response.path("data");
+            if (enrollmentData != null && !enrollmentData.isMissingNode() && enrollmentData.isArray()) {
+                allEnrollmentData.addAll((ArrayNode) enrollmentData);
+            }
+            start += limit;
         }
-        return performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
+        allEnrollmentData.forEach(eachContentData -> {
+            JsonNode contentPartnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(cbServerProperties.courseraPartnerCode);
+            String partnerId = contentPartnerInfo.get("id").asText();
+            callEnrollmentAPI(cbServerProperties.courseraPartnerCode, partnerId, eachContentData);
+        });
+        return allEnrollmentData;
     }
 
-    private Map<String, String> formUrlMapForEnrollment() {
+    private Map<String, String> formUrlMapForEnrollment(int start, int limit) {
+        log.info("Coursera Scheduler Service::formUrlMapForEnrollment");
         LocalDateTime currentDateTime = LocalDateTime.now();
         LocalDateTime previousDate = currentDateTime.minusDays(cbServerProperties.getCourseraDateRange());
         ZonedDateTime zonedDateTime = previousDate.atZone(ZoneId.of("UTC"));
@@ -66,17 +87,18 @@ public class CourseraSchedulerService implements SchedulerInterface {
         long currentMillis = System.currentTimeMillis();
         long timestampWithoutMillis = (currentMillis / 1000) * 1000;
         Map<String, String> urlMap = new HashMap<>();
-        urlMap.put("limit", cbServerProperties.getCourseraEnrollmentListLimit());
-        urlMap.put("start", "0");
-        urlMap.put("completedAtBefore", String.valueOf(timestampWithoutMillis));
-        urlMap.put("completedAtAfter", String.valueOf(timestamp));
+        urlMap.put("limit", String.valueOf(cbServerProperties.getCourseraEnrollmentListLimit()));
+        urlMap.put("start", String.valueOf(start));
+        urlMap.put(cbServerProperties.getCourseraDateBefore(), String.valueOf(timestampWithoutMillis));
+        urlMap.put(cbServerProperties.getCourseraDateAfter(), String.valueOf(timestamp));
         return urlMap;
     }
 
     @Override
     public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
-        log.info("calling service locator for getting {} enrollment list", partnerCode);
+        log.info("coursera scheduler service: performEnrollmentCall for partner code {}, request body {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
+        log.info("CourseraSchedulerService :: performEnrollmentCall url {}", url);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
@@ -87,54 +109,46 @@ public class CourseraSchedulerService implements SchedulerInterface {
                 Object.class
         );
         if (response.getStatusCode().is2xxSuccessful()) {
-            JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
-            JsonNode jsonData = jsonNode.path("responseData").get("elements");
-            jsonData.forEach(
-                    eachContentData -> {
-                        callEnrollmentAPI(partnerCode, eachContentData);
-                    });
-            return jsonData;
+            log.info("CourseraSchedulerService :: performEnrollmentCall response {}");
+            JsonNode jsonData = objectMapper.valueToTree(response.getBody());
+            if(!jsonData.isMissingNode()&&jsonData != null){
+                return jsonData;
+            }else{
+                log.error("Failed to retrieve response data: for partner code {}", partnerCode);
+            }
         } else {
             throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
         }
+        return null;
     }
 
     @Override
-    public void callEnrollmentAPI(String partnerCode, JsonNode rawContentData) {
+    public void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CourseSchedulerService::callCourseraEnrollmentAPI");
-            if (rawContentData.get("contentType").asText().equalsIgnoreCase("Specialization") && rawContentData.get("isCompleted").asBoolean()) {
-                JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-                if (!entity.path("transformProgressViaApi").isMissingNode()) {
-                    List<Object> contentJson = objectMapper.convertValue(entity.get("transformProgressViaApi"), new TypeReference<List<Object>>() {
-                    });
-                    JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
-                    String extCourseId = transformData.get("courseid").asText();
-                    String partnerId = entity.get("id").asText();
-                    JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId, partnerId);
-                    String courseId = result.path("content").get("contentId").asText();
-                    String[] parts = transformData.get("userid").asText().split("@");
-                    ((ObjectNode) transformData).put("userid", parts[0]);
-                    String userId = transformData.get("userid").asText();
-                    log.info("courseId  and userid {} {}", courseId, userId);
-                    Map<String, Object> propertyMap = new HashMap<>();
-                    propertyMap.put("userid", userId);
-                    propertyMap.put("courseid", courseId);
-                    propertyMap.put("progress", 100);
-                    List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
-                    if (CollectionUtils.isEmpty(listOfMasterData)) {
-                        Long date = Long.valueOf(transformData.get("completedon").asText());
-                        String formatedDate = updateDateFormatFromTimestamp(date);
-                        ((ObjectNode) transformData).put("completedon", formatedDate);
-                        ((ObjectNode) transformData).put("partnerCode", partnerCode);
-                        ((ObjectNode) transformData).put("partnerId", entity.get("id").asText());
-                        payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
-                        kafkaProducer.push(cbServerProperties.getTopic(), transformData);
-                    } else {
-                        log.info("Progress updated 100 for user {}", userId);
-                    }
+            if (transformData.get("contentType").asText().equalsIgnoreCase(cbServerProperties.getCourseraEnrollmentListCourseType()) && transformData.get("isCompleted").asBoolean()) {
+                String extCourseId = transformData.get("courseid").asText();
+                JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId, partnerId);
+                String courseId = result.path("content").get("contentId").asText();
+                String[] parts = transformData.get("userid").asText().split("@");
+                ((ObjectNode) transformData).put("userid", parts[0]);
+                String userId = transformData.get("userid").asText();
+                log.info("courseId  and userid {} {}", courseId, userId);
+                Map<String, Object> propertyMap = new HashMap<>();
+                propertyMap.put("userid", userId);
+                propertyMap.put("courseid", courseId);
+                propertyMap.put("progress", 100);
+                List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
+                if (CollectionUtils.isEmpty(listOfMasterData)) {
+                    Long date = Long.valueOf(transformData.get("completedon").asText());
+                    String formatedDate = updateDateFormatFromTimestamp(date);
+                    ((ObjectNode) transformData).put("completedon", formatedDate);
+                    ((ObjectNode) transformData).put("partnerCode", partnerCode);
+                    ((ObjectNode) transformData).put("partnerId", partnerId);
+                    payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
+                    kafkaProducer.push(cbServerProperties.getTopic(), transformData);
                 } else {
-                    throw new CiosContentException(Constants.ERROR, "please update transformProgressJson in content partner db for partnerCode " + partnerCode, HttpStatus.INTERNAL_SERVER_ERROR);
+                    log.info("Progress updated 100 for user {}", userId);
                 }
             }
         } catch (Exception e) {

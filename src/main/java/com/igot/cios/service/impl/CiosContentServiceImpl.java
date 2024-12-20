@@ -175,7 +175,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         try {
             log.info("CiosContentServiceImpl::saveOrUpdateContentFromProvider");
             JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            List<Object> contentJson = objectMapper.convertValue(entity.path("result").path("transformProgressJson"), new TypeReference<List<Object>>() {
+            List<Object> contentJson = objectMapper.convertValue(entity.get("transformProgressJson"), new TypeReference<List<Object>>() {
             });
             JsonNode transformData = dataTransformUtility.transformData(rawContentData, contentJson);
             payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
@@ -247,10 +247,9 @@ public class CiosContentServiceImpl implements CiosContentService {
         }
         Long totalCourseCount = repository.countByPartnerCode(partnerCode);
         JsonNode contentPartnerResponse = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-        JsonNode resultData = contentPartnerResponse.path(Constants.RESULT);
-        JsonNode data = resultData.path(Constants.DATA);
+        JsonNode data = contentPartnerResponse.path(Constants.DATA);
         ((ObjectNode) data).put(Constants.TOTAL_COURSES_COUNT, totalCourseCount);
-        dataTransformUtility.updatingPartnerInfo(resultData);
+        dataTransformUtility.updatingPartnerInfo(contentPartnerResponse);
         if (!errors.isEmpty()) {
             log.error("Validation errors: {}", errors);
             return buildErrorResponse(response, HttpStatus.BAD_REQUEST, String.join("\n", errors));
