@@ -79,6 +79,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
     }
 
     private Map<String, String> formUrlMapForEnrollment(int start, int limit) {
+        log.info("Coursera Scheduler Service::formUrlMapForEnrollment");
         LocalDateTime currentDateTime = LocalDateTime.now();
         LocalDateTime previousDate = currentDateTime.minusDays(cbServerProperties.getCourseraDateRange());
         ZonedDateTime zonedDateTime = previousDate.atZone(ZoneId.of("UTC"));
@@ -95,8 +96,9 @@ public class CourseraSchedulerService implements SchedulerInterface {
 
     @Override
     public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
-        log.info("calling service locator for getting {} enrollment list", partnerCode);
+        log.info("coursera scheduler service: performEnrollmentCall for partner code {}, request body {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
+        log.info("CourseraSchedulerService :: performEnrollmentCall url {}", url);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
@@ -107,6 +109,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
                 Object.class
         );
         if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("CourseraSchedulerService :: performEnrollmentCall response {}");
             JsonNode jsonData = objectMapper.valueToTree(response.getBody());
             if(!jsonData.isMissingNode()){
                 return jsonData;
@@ -123,7 +126,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
     public void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CourseSchedulerService::callCourseraEnrollmentAPI");
-            if (transformData.get("contentType").asText().equalsIgnoreCase("Specialization") && transformData.get("isCompleted").asBoolean()) {
+            if (transformData.get("contentType").asText().equalsIgnoreCase(cbServerProperties.getCourseraEnrollmentListCourseType()) && transformData.get("isCompleted").asBoolean()) {
                 String extCourseId = transformData.get("courseid").asText();
                 JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId, partnerId);
                 String courseId = result.path("content").get("contentId").asText();
