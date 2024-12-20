@@ -88,6 +88,7 @@ public class CornellSchedulerService implements SchedulerInterface {
     }
 
     public JsonNode loadEnrollment() {
+        log.info("CornellSchedulerService :: loadEnrollment()");
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
         requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
