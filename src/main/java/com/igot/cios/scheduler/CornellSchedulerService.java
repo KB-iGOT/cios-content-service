@@ -31,7 +31,7 @@ import java.security.NoSuchAlgorithmException;
 
 @Slf4j
 @Service
-public class CornellSchedulerService implements SchedulerInterface {
+public class CornellSchedulerService{
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -114,6 +114,7 @@ public class CornellSchedulerService implements SchedulerInterface {
         urlMap.put("completion_range", completionRange);
         return urlMap;
     }
+
 
     public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("calling service locator for getting {} enrollment list", partnerCode);

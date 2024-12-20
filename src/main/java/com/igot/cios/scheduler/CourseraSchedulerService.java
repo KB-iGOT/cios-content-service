@@ -29,7 +29,7 @@ import java.util.*;
 
 @Slf4j
 @Service
-public class CourseraSchedulerService implements SchedulerInterface {
+public class CourseraSchedulerService {
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -45,7 +45,6 @@ public class CourseraSchedulerService implements SchedulerInterface {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    @Override
     public JsonNode loadEnrollment() {
         log.info("Coursera Scheduler Service::loadEnrollment()");
         int start = 0;
@@ -94,8 +93,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
         return urlMap;
     }
 
-    @Override
-    public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("coursera scheduler service: performEnrollmentCall for partner code {}, request body {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         log.info("CourseraSchedulerService :: performEnrollmentCall url {}", url);
@@ -122,8 +120,7 @@ public class CourseraSchedulerService implements SchedulerInterface {
         return null;
     }
 
-    @Override
-    public void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
+    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CourseSchedulerService::callCourseraEnrollmentAPI");
             if (transformData.get("contentType").asText().equalsIgnoreCase(cbServerProperties.getCourseraEnrollmentListCourseType()) && transformData.get("isCompleted").asBoolean()) {
