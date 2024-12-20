@@ -48,7 +48,7 @@ public class CornellSchedulerService{
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    public void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
+    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CornellSchedulerService::callEnrollmentAPI");
             String extCourseId = transformData.get("courseid").asText();
@@ -115,9 +115,8 @@ public class CornellSchedulerService{
         return urlMap;
     }
 
-
-    public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
-        log.info("calling service locator for getting {} enrollment list", partnerCode);
+    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+        log.info("CornellSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
