@@ -46,7 +46,7 @@ public class CourseraSchedulerService {
     private DataTransformUtility dataTransformUtility;
 
     public JsonNode loadCourseraEnrollment() {
-        log.info("Coursera Scheduler Service::loadEnrollment()");
+        log.info("Coursera Scheduler Service::loadCourseraEnrollment()");
         int start = 0;
         int limit = cbServerProperties.getCourseraEnrollmentListLimit();
         String payload = null;
@@ -86,7 +86,7 @@ public class CourseraSchedulerService {
         long currentMillis = System.currentTimeMillis();
         long timestampWithoutMillis = (currentMillis / 1000) * 1000;
         Map<String, String> urlMap = new HashMap<>();
-        urlMap.put("limit", String.valueOf(cbServerProperties.getCourseraEnrollmentListLimit()));
+        urlMap.put("limit", String.valueOf(limit));
         urlMap.put("start", String.valueOf(start));
         urlMap.put(cbServerProperties.getCourseraDateBefore(), String.valueOf(timestampWithoutMillis));
         urlMap.put(cbServerProperties.getCourseraDateAfter(), String.valueOf(timestamp));
@@ -127,12 +127,12 @@ public class CourseraSchedulerService {
                 String extCourseId = transformData.get("courseid").asText();
                 JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId, partnerId);
                 String courseId = result.path("content").get("contentId").asText();
-                String[] parts = transformData.get("userid").asText().split("@");
-                ((ObjectNode) transformData).put("userid", parts[0]);
-                String userId = transformData.get("userid").asText();
+                String[] parts = transformData.get(Constants.USER_ID).asText().split("@");
+                ((ObjectNode) transformData).put(Constants.USER_ID, parts[0]);
+                String userId = transformData.get(Constants.USER_ID).asText();
                 log.info("courseId  and userid {} {}", courseId, userId);
                 Map<String, Object> propertyMap = new HashMap<>();
-                propertyMap.put("userid", userId);
+                propertyMap.put(Constants.USER_ID, userId);
                 propertyMap.put("courseid", courseId);
                 propertyMap.put("progress", 100);
                 List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);

@@ -74,7 +74,6 @@ public class CornellSchedulerService{
             } else {
                 log.info("Progress updated 100 for user {}", userId);
             }
-            log.info("callCornellEnrollmentAPI {} ", transformData.asText());
         } catch (Exception e) {
             log.error("error while processing", e);
             throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -88,7 +87,7 @@ public class CornellSchedulerService{
     }
 
     public JsonNode loadCornellEnrollment() {
-        log.info("CornellSchedulerService :: loadEnrollment()");
+        log.info("CornellSchedulerService :: loadCornellEnrollment()");
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
         requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
