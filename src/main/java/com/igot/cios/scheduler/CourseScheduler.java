@@ -28,7 +28,7 @@ public class CourseScheduler {
     private void callCornellEnrollmentApi() throws JsonProcessingException{
         if (schedulerEnabled) {
             log.info("CourseScheduler :: callCornellEnrollmentApi");
-            cornellSchedulerService.loadEnrollment();
+            cornellSchedulerService.loadCornellEnrollment();
         }
     }
 
@@ -36,7 +36,7 @@ public class CourseScheduler {
     private void callCourseraEnrollmentApi() throws JsonProcessingException {
         if (courseraSchedulerEnabled) {
             log.info("CourseScheduler :: callCourseraEnrollmentApi");
-            courseraSchedulerService.loadEnrollment();
+            courseraSchedulerService.loadCourseraEnrollment();
         }
     }
 }

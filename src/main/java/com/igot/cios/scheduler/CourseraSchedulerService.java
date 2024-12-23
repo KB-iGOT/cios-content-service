@@ -29,7 +29,7 @@ import java.util.*;
 
 @Slf4j
 @Service
-public class CourseraSchedulerService implements SchedulerInterface {
+public class CourseraSchedulerService {
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -45,9 +45,8 @@ public class CourseraSchedulerService implements SchedulerInterface {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    @Override
-    public JsonNode loadEnrollment() {
-        log.info("Coursera Scheduler Service::loadEnrollment()");
+    public JsonNode loadCourseraEnrollment() {
+        log.info("Coursera Scheduler Service::loadCourseraEnrollment()");
         int start = 0;
         int limit = cbServerProperties.getCourseraEnrollmentListLimit();
         String payload = null;
@@ -87,15 +86,14 @@ public class CourseraSchedulerService implements SchedulerInterface {
         long currentMillis = System.currentTimeMillis();
         long timestampWithoutMillis = (currentMillis / 1000) * 1000;
         Map<String, String> urlMap = new HashMap<>();
-        urlMap.put("limit", String.valueOf(cbServerProperties.getCourseraEnrollmentListLimit()));
+        urlMap.put("limit", String.valueOf(limit));
         urlMap.put("start", String.valueOf(start));
         urlMap.put(cbServerProperties.getCourseraDateBefore(), String.valueOf(timestampWithoutMillis));
         urlMap.put(cbServerProperties.getCourseraDateAfter(), String.valueOf(timestamp));
         return urlMap;
     }
 
-    @Override
-    public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("coursera scheduler service: performEnrollmentCall for partner code {}, request body {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         log.info("CourseraSchedulerService :: performEnrollmentCall url {}", url);
@@ -122,20 +120,19 @@ public class CourseraSchedulerService implements SchedulerInterface {
         return null;
     }
 
-    @Override
-    public void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
+    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CourseSchedulerService::callCourseraEnrollmentAPI");
             if (transformData.get("contentType").asText().equalsIgnoreCase(cbServerProperties.getCourseraEnrollmentListCourseType()) && transformData.get("isCompleted").asBoolean()) {
                 String extCourseId = transformData.get("courseid").asText();
                 JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId, partnerId);
                 String courseId = result.path("content").get("contentId").asText();
-                String[] parts = transformData.get("userid").asText().split("@");
-                ((ObjectNode) transformData).put("userid", parts[0]);
-                String userId = transformData.get("userid").asText();
+                String[] parts = transformData.get(Constants.USER_ID).asText().split("@");
+                ((ObjectNode) transformData).put(Constants.USER_ID, parts[0]);
+                String userId = transformData.get(Constants.USER_ID).asText();
                 log.info("courseId  and userid {} {}", courseId, userId);
                 Map<String, Object> propertyMap = new HashMap<>();
-                propertyMap.put("userid", userId);
+                propertyMap.put(Constants.USER_ID, userId);
                 propertyMap.put("courseid", courseId);
                 propertyMap.put("progress", 100);
                 List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
