@@ -31,7 +31,7 @@ import java.security.NoSuchAlgorithmException;
 
 @Slf4j
 @Service
-public class CornellSchedulerService implements SchedulerInterface {
+public class CornellSchedulerService{
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -87,8 +87,8 @@ public class CornellSchedulerService implements SchedulerInterface {
         return sdf.format(date);
     }
 
-    public JsonNode loadEnrollment() {
-        log.info("CornellSchedulerService :: loadEnrollment()");
+    public JsonNode loadCornellEnrollment() {
+        log.info("CornellSchedulerService :: loadCornellEnrollment()");
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
         requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
@@ -115,8 +115,8 @@ public class CornellSchedulerService implements SchedulerInterface {
         return urlMap;
     }
 
-    public JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
-        log.info("calling service locator for getting {} enrollment list", partnerCode);
+    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+        log.info("CornellSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
