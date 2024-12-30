@@ -229,12 +229,12 @@ public class CiosContentServiceImpl implements CiosContentService {
                     JsonNode ciosData = entity.getCiosData(); // Assuming this getter method exists
                     if (ciosData != null && ciosData.path("content").has("status")) {
                         String status = ciosData.path("content").get("status").asText();
-                        if ("notInitiated".equalsIgnoreCase(status)) {
+                        if ("notInitiated".equalsIgnoreCase(status)||"draft".equalsIgnoreCase(status)) {
                             repository.delete(entity);
                             String uniqueId = deleteContentRequestDto.getPartnerCode() + "_" + entity.getExternalId();
                             esUtilService.deleteDocument(uniqueId, Constants.CIOS_CONTENT_INDEX_NAME);
                         } else {
-                            errors.add("External ID: " + id + " cannot be deleted because its status is not 'notInitiated'.");
+                            errors.add("External ID: " + id + " cannot be deleted because its status is neither 'notInitiated' nor 'draft'.");
                         }
                     } else {
                         errors.add("External ID: " + id + " does not have a valid status in ciosData.");
