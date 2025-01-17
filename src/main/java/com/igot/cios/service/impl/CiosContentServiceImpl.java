@@ -229,7 +229,7 @@ public class CiosContentServiceImpl implements CiosContentService {
                     JsonNode ciosData = entity.getCiosData(); // Assuming this getter method exists
                     if (ciosData != null && ciosData.path("content").has("status")) {
                         String status = ciosData.path("content").get("status").asText();
-                        if ("notInitiated".equalsIgnoreCase(status)) {
+                        if (Constants.NOT_INITIATED.equalsIgnoreCase(status) || Constants.DRAFT.equalsIgnoreCase(status)) {
                             repository.delete(entity);
                             String uniqueId = deleteContentRequestDto.getPartnerCode() + "_" + entity.getExternalId();
                             esUtilService.deleteDocument(uniqueId, Constants.CIOS_CONTENT_INDEX_NAME);
