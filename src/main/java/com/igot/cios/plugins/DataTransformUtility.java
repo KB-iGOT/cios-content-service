@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.FileInfoEntity;
@@ -35,10 +36,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -353,36 +351,39 @@ public class DataTransformUtility {
         }
     }
 
-    public void updateProcessedDataInDb(JsonNode processedData, String partnerCode, String fileName, String fileId, List<Object> contentJson,String partnerId) {
-        List<CornellContentEntity> cornellContentEntityList = new ArrayList<>();
-        processedData.forEach(eachContentData -> {
-            JsonNode transformData = transformData(eachContentData, contentJson);
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            if (transformData != null &&
-                    transformData.path(Constants.CONTENT) != null &&
-                    transformData.path(Constants.CONTENT).get(Constants.DURATION) != null) {
-                String durationString = transformData.path(Constants.CONTENT).get(Constants.DURATION).textValue();
-                String[] parts = durationString.split(" ");
-                String duration = String.valueOf(Integer.parseInt(parts[0]));
-                ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.DURATION, duration).asText();
-            }
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.FILE_ID, fileId).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.SOURCE, fileName).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PARTNER_CODE, partnerCode).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.STATUS, Constants.NOT_INITIATED).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.CREATED_DATE, currentTime.toString()).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.UPDATED_DATE, currentTime.toString()).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.ACTIVE, Constants.ACTIVE_STATUS).asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PUBLISHED_ON, "0000-00-00 00:00:00").asText();
-            ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.PARTNER_ID, partnerId).asText();
-            validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformData);
-            addSearchTags(transformData);
-            String externalId = transformData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
-            CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformData, eachContentData, currentTime, fileId,partnerId,partnerCode);
-            cornellContentEntityList.add(cornellContentEntity);
-
-        });
-        cornellBulkSave(cornellContentEntityList, partnerCode);
+    public void updateProcessedDataInDb(JsonNode transformData, String partnerCode, String fileName, String fileId,String partnerId) {
+        try {
+            List<CornellContentEntity> cornellContentEntityList = new ArrayList<>();
+            transformData.forEach(eachContentData -> {
+                Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+                if (eachContentData != null &&
+                        eachContentData.path(Constants.CONTENT) != null &&
+                        eachContentData.path(Constants.CONTENT).get(Constants.DURATION) != null) {
+                    String durationString = eachContentData.path(Constants.CONTENT).get(Constants.DURATION).textValue();
+                    String[] parts = durationString.split(" ");
+                    String duration = String.valueOf(Integer.parseInt(parts[0]));
+                    ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.DURATION, duration).asText();
+                }
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.FILE_ID, fileId).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.SOURCE, fileName).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.PARTNER_CODE, partnerCode).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.STATUS, Constants.NOT_INITIATED).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.CREATED_DATE, currentTime.toString()).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.UPDATED_DATE, currentTime.toString()).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.ACTIVE, Constants.ACTIVE_STATUS).asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.PUBLISHED_ON, "0000-00-00 00:00:00").asText();
+                ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.PARTNER_ID, partnerId).asText();
+                validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, eachContentData);
+                addSearchTags(eachContentData);
+                String externalId = eachContentData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
+                CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, eachContentData, eachContentData, currentTime, fileId, partnerId, partnerCode);
+                cornellContentEntityList.add(cornellContentEntity);
+            });
+            cornellBulkSave(cornellContentEntityList, partnerCode);
+        }catch (Exception e){
+            log.error("Error while updating processed data in DB", e);
+            throw new CiosContentException("Error while updating processed data in DB", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     private JsonNode addSearchTags(JsonNode transformData) {
@@ -489,5 +490,142 @@ public class DataTransformUtility {
         } catch (Exception e) {
             throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public Map<String, Object> processRowsAndCreateLogs(
+            List<Map<String, String>> processedData,
+            String fileId,
+            String fileName,
+            String partnerCode,
+            String loadContentErrorMessage,
+            String partnerId) throws IOException {
+        List<Map<String, String>> successProcessedData=new ArrayList<>();
+
+        log.info("Starting row validation and log generation for file: {}", fileName);
+        List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
+        List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
+        boolean hasFailures = false;
+
+        JsonNode contentPartnerResponse = fetchPartnerInfoUsingApi(partnerCode);
+        JsonNode fileValidation = contentPartnerResponse.path("contentFileValidation");
+        JsonNode jsonData = contentPartnerResponse.path("trasformContentJson");
+        if (loadContentErrorMessage != null) {
+            LinkedHashMap<String, String> loadContentErrorLog = new LinkedHashMap<>();
+            loadContentErrorLog.put(Constants.FILE_ID, fileId);
+            loadContentErrorLog.put(Constants.FILE_NAME, fileName);
+            loadContentErrorLog.put(Constants.STATUS, Constants.FAILED);
+            loadContentErrorLog.put("error", loadContentErrorMessage);
+            errorLogs.add(loadContentErrorLog);
+            hasFailures = true;
+        } else {
+            List<Object> transformContentJson = objectMapper.convertValue(
+                    jsonData,
+                    new TypeReference<List<Object>>() {
+                    });
+            if (fileValidation == null || fileValidation.isMissingNode() || fileValidation.isEmpty()){
+                log.error("File validation not found for partner: {}", partnerCode);
+                loadContentErrorMessage = "File validation is missing, please update in contentPartner: " + partnerCode;
+                LinkedHashMap<String, String> validationErrorLog = new LinkedHashMap<>();
+                validationErrorLog.put(Constants.FILE_ID, fileId);
+                validationErrorLog.put(Constants.FILE_NAME, fileName);
+                validationErrorLog.put(Constants.STATUS, Constants.FAILED);
+                validationErrorLog.put("error", loadContentErrorMessage);
+                errorLogs.add(validationErrorLog);
+                hasFailures = true;
+            } else if (transformContentJson == null || transformContentJson.isEmpty()) {
+                log.error("trasformContentJson is missing, please update in contentPartner for partner {}", partnerCode);
+                loadContentErrorMessage = "trasformContentJson is missing, please update in contentPartner: " + partnerCode;
+                LinkedHashMap<String, String> transformErrorLog = new LinkedHashMap<>();
+                transformErrorLog.put(Constants.FILE_ID, fileId);
+                transformErrorLog.put(Constants.FILE_NAME, fileName);
+                transformErrorLog.put(Constants.STATUS, Constants.FAILED);
+                transformErrorLog.put("error", loadContentErrorMessage);
+                errorLogs.add(transformErrorLog);
+                hasFailures = true;
+            } else {
+                for (Map<String, String> row : processedData) {
+                    LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
+                    List<String> validationErrors = validateRowData(linkedRow, fileValidation);
+                    if (validationErrors.isEmpty()) {
+                        linkedRow.put(Constants.STATUS, Constants.SUCCESS);
+                        linkedRow.put("error", "");
+                        successLogs.add(linkedRow);
+                        successProcessedData.add(row);
+                    } else {
+                        linkedRow.put(Constants.STATUS, Constants.FAILED);
+                        linkedRow.put("error", String.join(", ", validationErrors));
+                        errorLogs.add(linkedRow);
+                        hasFailures = true;
+                    }
+                }
+                if (!successProcessedData.isEmpty()) {
+                    ArrayNode transformedDataArray = JsonNodeFactory.instance.arrayNode();
+                    for (Map<String, String> row : successProcessedData) {
+                        JsonNode transformedData = transformData(row, transformContentJson);
+                        if (transformedData != null) {
+                            transformedDataArray.add(transformedData);
+                        }
+                    }
+                    updateProcessedDataInDb(transformedDataArray, partnerCode, fileName, fileId, partnerId);
+                }
+            }
+        }
+        List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>(successLogs);
+        combinedLogs.addAll(errorLogs);
+
+        // Write logs to a local file
+        String logFileName = fileName + "_" + partnerCode + "_log.txt";
+        File logFile = writeLogsToFile(combinedLogs, logFileName);
+        log.info("Log file created locally at: {}", logFile.getAbsolutePath());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("logFile", logFile);
+        result.put("hasFailures", hasFailures);
+        return result;
+    }
+
+    public File writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
+        log.info("Logs written to file: {}", originalFileName);
+        String csvFileName = originalFileName + "_log.csv";
+        String tempDir = System.getProperty("java.io.tmpdir");
+        String csvFilePath = tempDir + File.separator + csvFileName;
+        File logFile = new File(csvFilePath);
+        if (!logFile.exists()) {
+            logFile.getParentFile().mkdirs();
+            logFile.createNewFile();
+        }
+        try (FileWriter writer = new FileWriter(csvFilePath)) {
+            if (!logs.isEmpty()) {
+                LinkedHashMap<String, String> firstLog = logs.get(0);
+                StringBuilder header = new StringBuilder();
+                for (String key : firstLog.keySet()) {
+                    header.append(escapeSpecialCharacters(key)).append(" | ");
+                }
+                header.append(Constants.TIME);
+                writer.write(header.toString());
+                writer.write(System.lineSeparator());
+                for (LinkedHashMap<String, String> logEntry : logs) {
+                    StringBuilder row = new StringBuilder();
+                    for (String key : firstLog.keySet()) {
+                        row.append(escapeSpecialCharacters(logEntry.getOrDefault(key, ""))).append(" | ");
+                    }
+                    String timestamp = new Timestamp(System.currentTimeMillis()).toString();
+                    row.append(timestamp);
+                    writer.write(row.toString());
+                    writer.write(System.lineSeparator());
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return logFile;
+    }
+
+    private String escapeSpecialCharacters(String value) {
+        String escapedValue = value;
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return escapedValue;
     }
 }
