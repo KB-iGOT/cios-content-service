@@ -599,7 +599,7 @@ public class DataTransformUtility {
                 LinkedHashMap<String, String> firstLog = logs.get(0);
                 StringBuilder header = new StringBuilder();
                 for (String key : firstLog.keySet()) {
-                    header.append(escapeSpecialCharacters(key)).append(" | ");
+                    header.append(escapeSpecialCharacters(key)).append(",");
                 }
                 header.append(Constants.TIME);
                 writer.write(header.toString());
@@ -607,7 +607,7 @@ public class DataTransformUtility {
                 for (LinkedHashMap<String, String> logEntry : logs) {
                     StringBuilder row = new StringBuilder();
                     for (String key : firstLog.keySet()) {
-                        row.append(escapeSpecialCharacters(logEntry.getOrDefault(key, ""))).append(" | ");
+                        row.append(escapeSpecialCharacters(logEntry.getOrDefault(key, ""))).append(",");
                     }
                     String timestamp = new Timestamp(System.currentTimeMillis()).toString();
                     row.append(timestamp);
