@@ -47,7 +47,7 @@ public class OnboardContentConsumer {
     private FileInfoRepository fileInfoRepository;
 
     @Autowired
-    private StoreFileToGCP storeFileToGCP;
+    private StoreFileToGCP gcpBucket;
 
     @Autowired
     private CbServerProperties cbServerProperties;
@@ -104,7 +104,7 @@ public class OnboardContentConsumer {
                 contentUploadedGCPFileName = fileInfoEntity.getContentUploadedGCPFileName();
             }
 
-            ResponseEntity<?> response = storeFileToGCP.downloadCiosContentFile(contentUploadedGCPFileName);
+            ResponseEntity<?> response = gcpBucket.downloadCiosContentFile(contentUploadedGCPFileName);
             if (!response.getStatusCode().is2xxSuccessful() || !(response.getBody() instanceof ByteArrayResource)) {
                 log.error("Failed to download file: {}", contentUploadedGCPFileName);
                 return;
@@ -125,7 +125,7 @@ public class OnboardContentConsumer {
                 throw new IllegalArgumentException("The file contains no valid data or has an unsupported format.");
             }
 
-            Map<String, Object> result = ciosContentServiceimpl.processRowsAndCreateLogs(
+            Map<String, Object> result = dataTransformUtility.processRowsAndCreateLogs(
                     processedData, fileId, fileName, partnerCode, null, partnerId);
             File logFile = (File) result.get(Constants.LOG_FILE);
             boolean hasFailures = (boolean) result.get(Constants.HAS_FAILURES);
@@ -136,7 +136,7 @@ public class OnboardContentConsumer {
             loadContentErrorMessage = "Error in processReceivedData: " + e.getMessage();
             log.error(loadContentErrorMessage, e);
             try {
-                Map<String, Object> errorResult = ciosContentServiceimpl.processRowsAndCreateLogs(
+                Map<String, Object> errorResult = dataTransformUtility.processRowsAndCreateLogs(
                         null, fileId, fileName, partnerCode, loadContentErrorMessage, partnerId);
 
                 File errorLogFile = (File) errorResult.get(Constants.LOG_FILE);
@@ -157,35 +157,9 @@ public class OnboardContentConsumer {
         }
     }
 
-
-    public void processReceivedData(String partnerCode, List<Map<String, String>> processedData, String fileName, String fileId, String partnerId) throws IOException {
-        log.info("Processing {} records for partner code {}", processedData.size(), partnerCode);
-        JsonNode jsonData = objectMapper.valueToTree(processedData);
-        boolean isCacheExpired = System.currentTimeMillis() - cacheTimestamp > Constants.CACHE_EXPIRY_DURATION;
-        if (cachedPartnerCode == null || !cachedPartnerCode.equals(partnerCode) || isCacheExpired) {
-            JsonNode partnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-            // Extract and cache contentJson
-            cachedContentJson = objectMapper.convertValue(
-                    partnerInfo.path("trasformContentJson"),
-                    new TypeReference<List<Object>>() {
-                    }
-            );
-            if (cachedContentJson == null || cachedContentJson.isEmpty()) {
-                log.error("trasformContentJson is missing, please update in contentPartner for partner {}",partnerCode);
-                throw new CiosContentException(
-                        "ERROR",
-                        "trasformContentJson is missing, please update in contentPartner",
-                        HttpStatus.INTERNAL_SERVER_ERROR
-                );
-            }
-            cachedPartnerCode = partnerCode;
-        }
-        dataTransformUtility.updateProcessedDataInDb(jsonData, partnerCode, fileName, fileId, cachedContentJson, partnerId);
-    }
-
     public void uploadLogFileToGCP(File logFile, String partnerId, String fileId, String fileName, Timestamp initiatedOn, boolean hasFailures, String contentUploadedGCPFileName) throws IOException {
         log.info("consumeMessage::uploadLogFileToGCP:uploading file to GCP");
-        SBApiResponse uploadedGCPFileResponse = storeFileToGCP.uploadCiosLogsFile(
+        SBApiResponse uploadedGCPFileResponse = gcpBucket.uploadCiosLogsFile(
                 logFile,
                 cbServerProperties.getCiosCloudContainerName(),
                 cbServerProperties.getCiosFileLogsCloudFolderName());
@@ -199,4 +173,5 @@ public class OnboardContentConsumer {
         String status = hasFailures ? Constants.CONTENT_UPLOAD_FAILED : Constants.CONTENT_UPLOAD_SUCCESSFULLY;
         dataTransformUtility.createFileInfo(partnerId, fileId, fileName, initiatedOn, completedOn, status, uploadedGCPFileName, contentUploadedGCPFileName);
     }
+
 }
