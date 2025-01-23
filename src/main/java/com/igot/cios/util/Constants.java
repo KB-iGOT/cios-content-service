@@ -106,6 +106,7 @@ public class Constants {
     public static final long CACHE_EXPIRY_DURATION = 300000;
     public static final String DURATION = "duration";
     public static final String USER_ID = "userid";
+    public static final String LOCAL_DATACENTER = "spring.cassandra.local-datacenter";
 
 
     private Constants() {
