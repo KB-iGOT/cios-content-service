@@ -8,13 +8,14 @@ import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PropertiesCache;
+import jakarta.annotation.PostConstruct;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;

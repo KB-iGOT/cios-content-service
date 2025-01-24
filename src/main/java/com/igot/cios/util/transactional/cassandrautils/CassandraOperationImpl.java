@@ -10,8 +10,9 @@ import com.datastax.oss.driver.api.querybuilder.update.UpdateStart;
 import com.datastax.oss.driver.api.querybuilder.update.UpdateWithAssignments;
 import com.igot.cios.util.ApiResponse;
 import com.igot.cios.util.Constants;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,7 @@ public class CassandraOperationImpl implements CassandraOperation {
     private Select processQuery(String keyspaceName, String tableName, Map<String, Object> propertyMap,
                                 List<String> fields) {
         Select select;
-        if (org.apache.commons.collections.CollectionUtils.isNotEmpty(fields)) {
+        if (CollectionUtils.isNotEmpty(fields)) {
             select = com.datastax.oss.driver.api.querybuilder.QueryBuilder.selectFrom(keyspaceName, tableName).columns(fields);
         } else {
             select = com.datastax.oss.driver.api.querybuilder.QueryBuilder.selectFrom(keyspaceName, tableName).all();
