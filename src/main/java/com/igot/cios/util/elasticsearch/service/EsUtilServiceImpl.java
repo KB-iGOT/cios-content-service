@@ -132,19 +132,20 @@ public class EsUtilServiceImpl implements EsUtilService {
 
     @Override
     public SearchResult searchDocuments(String esIndexName, SearchCriteria searchCriteria) {
-        co.elastic.clients.elasticsearch.core.SearchRequest searchRequest = buildSearchRequest(searchCriteria);
-        SearchRequest.Builder searchRequestBuilder = searchRequestBuild(searchRequest, esIndexName);
-        searchRequest = searchRequestBuilder.build();
+        SearchRequest.Builder searchRequestBuilder = buildSearchRequest(searchCriteria);
+        assert searchRequestBuilder != null;
+        searchRequestBuilder.index(esIndexName);
         try {
             if (searchCriteria != null) {
                 int pageNumber = searchCriteria.getPageNumber();
                 int pageSize = searchCriteria.getPageSize();
                 int from = pageNumber * pageSize;
                 searchRequestBuilder.from(from);
-                if (pageSize != 0) {
+                if (pageSize > 0) {
                     searchRequestBuilder.size(pageSize);
                 }
             }
+            SearchRequest searchRequest = searchRequestBuilder.build();
             SearchResponse<Object> paginatedSearchResponse =
                     elasticsearchClient.search(searchRequest, Object.class);
             List<Map<String, Object>> paginatedResult = extractPaginatedResult(paginatedSearchResponse);
@@ -192,7 +193,7 @@ public class EsUtilServiceImpl implements EsUtilService {
         return paginatedResult;
     }
 
-    private SearchRequest buildSearchRequest(SearchCriteria searchCriteria) {
+    private SearchRequest.Builder buildSearchRequest(SearchCriteria searchCriteria) {
         log.info("Building search query");
         if (searchCriteria == null || searchCriteria.toString().isEmpty()) {
             log.error("Search criteria body is missing");
@@ -208,7 +209,7 @@ public class EsUtilServiceImpl implements EsUtilService {
         Query queryPart = buildQueryPart(searchCriteria.getQuery());
         boolQueryBuilder.must(queryPart);
         log.info("final search query result {}", searchSourceBuilder);
-        return searchSourceBuilder.build();
+        return searchSourceBuilder;
     }
 
     private BoolQuery.Builder buildFilterQuery(Map<String, Object> filterCriteriaMap) {
@@ -529,6 +530,12 @@ public class EsUtilServiceImpl implements EsUtilService {
         }
         if (original.source() != null) {
             builder.source(original.source());
+        }
+        if (original.from() != null) {
+            builder.from(original.from());
+        }
+        if (original.size() != null) {
+            builder.size(original.size());
         }
         return builder;
     }
