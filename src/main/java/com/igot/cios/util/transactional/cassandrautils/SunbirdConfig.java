@@ -24,16 +24,16 @@ public class SunbirdConfig extends CassandraConfig {
 
 	private Logger logger = LoggerFactory.getLogger(SunbirdConfig.class);
 
-	@Value("${spring.data.cassandra.username}")
+	@Value("${spring.cassandra.username}")
 	private String sunbirdUser;
 
-	@Value("${spring.data.cassandra.password}")
+	@Value("${spring.cassandra.password}")
 	private String sunbirdPassword;
 
 	@Value("${cassandra.config.host}")
 	private String contactPoints;
 
-	@Value("${spring.data.cassandra.port}")
+	@Value("${spring.cassandra.port}")
 	private String port;
 
 	@NotNull
