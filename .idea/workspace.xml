@@ -4,7 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cfb13bf4-69bb-424c-bc88-a17bc7ea626e" name="Changes" comment="" />
+    <list default="true" id="cfb13bf4-69bb-424c-bc88-a17bc7ea626e" name="Changes" comment="cassendra new configuration.">
+      <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/jarRepositories.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/igot/cios/util/transactional/cassandrautils/SunbirdConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/igot/cios/util/transactional/cassandrautils/SunbirdConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/application.properties" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -26,12 +34,27 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;pathiktarento1089&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/pathiktarento1089/cios-content-service.git&quot;,
+    &quot;accountId&quot;: &quot;6eeeedc1-d3d0-4f69-99e4-eec7c0a38fad&quot;
+  }
+}</component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
       <MavenGeneralSettings>
         <option name="mavenHomeTypeForPersistence" value="WRAPPER" />
       </MavenGeneralSettings>
     </option>
+  </component>
+  <component name="MavenRunner">
+    <option name="skipTests" value="true" />
   </component>
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
@@ -47,12 +70,16 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;Application.CiosContentServiceApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Maven.cios-content-service [clean,test,install].executor&quot;: &quot;Run&quot;,
     &quot;Maven.cios-content-service [clean].executor&quot;: &quot;Run&quot;,
     &quot;Maven.cios-content-service [install].executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;develop&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;SONARLINT_PRECOMMIT_ANALYSIS&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;4.8.21-versionUpdate&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/arpithasureshappa/igot/cios-content-service&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/pathiknandi/shruthi&quot;,
     &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
@@ -65,11 +92,11 @@
       <recent name="$PROJECT_DIR$/src/main/java/com/igot/cios" />
     </key>
     <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.igot.cios.util.transactional.cassandrautils" />
       <recent name="com.igot.cios.cbpores.repository" />
       <recent name="com.igot.cios.cbpores.entity" />
       <recent name="com.igot.cios.cbpores.service.impl" />
       <recent name="com.igot.cios.cbpores.service" />
-      <recent name="com.igot.cios.cbpores.exception" />
     </key>
   </component>
   <component name="RunManager">
@@ -101,7 +128,47 @@
       <option name="presentableId" value="Default" />
       <updated>1717410207067</updated>
     </task>
+    <task id="LOCAL-00001" summary="i have updated the SDK version and groupId for cloud store.">
+      <option name="closed" value="true" />
+      <created>1737722637145</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1737722637145</updated>
+    </task>
+    <task id="LOCAL-00002" summary="fixed bug for pagination for search API.">
+      <option name="closed" value="true" />
+      <created>1737966775758</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1737966775759</updated>
+    </task>
+    <task id="LOCAL-00003" summary="have changed sdk cloud dependency.">
+      <option name="closed" value="true" />
+      <created>1737973764713</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1737973764713</updated>
+    </task>
+    <task id="LOCAL-00004" summary="cassendra new configuration.">
+      <option name="closed" value="true" />
+      <created>1738236992281</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1738236992281</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="i have updated the SDK version and groupId for cloud store." />
+    <MESSAGE value="fixed bug for pagination for search API." />
+    <MESSAGE value="have changed sdk cloud dependency." />
+    <MESSAGE value="cassendra new configuration." />
+    <option name="LAST_COMMIT_MESSAGE" value="cassendra new configuration." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -145,6 +212,16 @@
           <url>file://$PROJECT_DIR$/src/main/java/com/igot/cios/service/impl/CiosContentServiceImpl.java</url>
           <line>78</line>
           <option name="timeStamp" value="37" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/igot/cios/service/impl/CiosContentServiceImpl.java</url>
+          <line>281</line>
+          <option name="timeStamp" value="38" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/igot/cios/util/transactional/cassandrautils/SunbirdConfig.java</url>
+          <line>51</line>
+          <option name="timeStamp" value="39" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
