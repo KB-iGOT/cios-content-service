@@ -16,7 +16,7 @@ public class Constants {
     public static final String HEARTBEAT_INTERVAL = "heartbeatIntervalSeconds";
     public static final String POOL_TIMEOUT = "poolTimeoutMillis";
     public static final String CASSANDRA_CONFIG_HOST = "cassandra.config.host";
-    public static final String SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL = "LOCAL_QUORUM";
+    public static final String SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL = "sunbird_cassandra_consistency_level";
     public static final String EXCEPTION_MSG_FETCH = "Exception occurred while fetching record from ";
     public static final String INSERT_INTO = "INSERT INTO ";
     public static final String DOT = ".";
@@ -106,7 +106,6 @@ public class Constants {
     public static final long CACHE_EXPIRY_DURATION = 300000;
     public static final String DURATION = "duration";
     public static final String USER_ID = "userid";
-    public static final String LOCAL_DATACENTER = "spring.cassandra.local-datacenter";
 
 
     private Constants() {
