@@ -1,8 +1,8 @@
 package com.igot.cios.util.transactional.cassandrautils;
 
-import com.datastax.driver.core.ColumnDefinitions;
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Row;
+
+import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.Row;
 import com.igot.cios.util.Constants;
 
 import java.util.*;
@@ -68,13 +68,11 @@ public final class CassandraUtil {
     }
 
     public static Map<String, String> fetchColumnsMapping(ResultSet results) {
-        return results
-                .getColumnDefinitions()
-                .asList()
-                .stream()
-                .collect(
-                        Collectors.toMap(
-                                d -> propertiesCache.readProperty(d.getName()).trim(),
-                                ColumnDefinitions.Definition::getName));
+        Map<String, String> columnsMapping = new HashMap<>();
+        results.getColumnDefinitions().forEach(column -> {
+            String property = propertiesCache.readProperty(column.getName().asInternal()).trim();
+            columnsMapping.put(property, column.getName().asInternal());
+        });
+        return columnsMapping;
     }
 }

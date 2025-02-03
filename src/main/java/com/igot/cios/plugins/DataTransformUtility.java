@@ -41,8 +41,6 @@ import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import static javax.xml.bind.DatatypeConverter.parseDate;
-
 @Slf4j
 @Component
 public class DataTransformUtility {
@@ -150,15 +148,6 @@ public class DataTransformUtility {
             throw new RuntimeException(e.getMessage());
         }
         return dataRows;
-    }
-
-    private boolean isDate(String value) {
-        try {
-            parseDate(value);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     public JsonNode transformData(Object sourceObject, List<Object> specJson) {
@@ -438,12 +427,10 @@ public class DataTransformUtility {
                 String uniqueId = partnerCode + "_" + contentEntity.getExternalId();
                 esUtilService.addDocument(
                         Constants.CIOS_CONTENT_INDEX_NAME,
-                        Constants.INDEX_TYPE,
                         uniqueId,
                         entityMap,
                         cbServerProperties.getElasticCiosContentJsonPath()
                 );
-                //log.info("Added data to ES document for externalId: {}", contentEntity.getExternalId());
             } catch (Exception e) {
                 log.error("Error while processing contentEntity with externalId: {}", contentEntity.getExternalId(), e);
             }
