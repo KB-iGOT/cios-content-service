@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.consumer.OnboardContentConsumer;
 import com.igot.cios.dto.DeleteContentRequestDto;
@@ -67,8 +68,6 @@ public class CiosContentServiceImpl implements CiosContentService {
     EsUtilService esUtilService;
     @Value("${search.result.redis.ttl}")
     private long searchResultRedisTtl;
-    @Autowired
-    private RedisTemplate<String, SearchResult> redisTemplate;
     @Autowired
     private StoreFileToGCP storeFileToGCP;
     @Autowired
@@ -229,7 +228,7 @@ public class CiosContentServiceImpl implements CiosContentService {
                     JsonNode ciosData = entity.getCiosData(); // Assuming this getter method exists
                     if (ciosData != null && ciosData.path("content").has("status")) {
                         String status = ciosData.path("content").get("status").asText();
-                        if ("notInitiated".equalsIgnoreCase(status)) {
+                        if (Constants.NOT_INITIATED.equalsIgnoreCase(status) || Constants.DRAFT.equalsIgnoreCase(status)) {
                             repository.delete(entity);
                             String uniqueId = deleteContentRequestDto.getPartnerCode() + "_" + entity.getExternalId();
                             esUtilService.deleteDocument(uniqueId, Constants.CIOS_CONTENT_INDEX_NAME);
@@ -340,109 +339,6 @@ public class CiosContentServiceImpl implements CiosContentService {
         ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.CONTENT_SEARCH_TAGS, searchTagsArray);
         return transformData;
     }
-
-    public Map<String, Object> processRowsAndCreateLogs(
-            List<Map<String, String>> processedData,
-            String fileId,
-            String fileName,
-            String partnerCode,
-            String loadContentErrorMessage,
-            String partnerId) throws IOException {
-
-        log.info("Starting row validation and log generation for file: {}", fileName);
-        List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
-        List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
-        boolean hasFailures = false;
-
-        JsonNode response = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-        JsonNode fileValidation = response.path(Constants.RESULT).path("contentFileValidation");
-
-        if (loadContentErrorMessage != null) {
-            LinkedHashMap<String, String> loadContentErrorLog = new LinkedHashMap<>();
-            loadContentErrorLog.put(Constants.FILE_ID, fileId);
-            loadContentErrorLog.put(Constants.FILE_NAME, fileName);
-            loadContentErrorLog.put(Constants.STATUS, Constants.FAILED);
-            loadContentErrorLog.put("error", loadContentErrorMessage);
-            errorLogs.add(loadContentErrorLog);
-            hasFailures = true;
-        } else {
-            for (Map<String, String> row : processedData) {
-                LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
-                List<String> validationErrors = dataTransformUtility.validateRowData(linkedRow, fileValidation);
-
-                if (validationErrors.isEmpty()) {
-                    linkedRow.put(Constants.STATUS, Constants.SUCCESS);
-                    linkedRow.put("error", "");
-                    successLogs.add(linkedRow);
-                    List<Map<String, String>> successProcessedData = Collections.singletonList(row);
-                    onboardContentConsumer.processReceivedData(partnerCode, successProcessedData, fileName, fileId, partnerId);
-                } else {
-                    linkedRow.put(Constants.STATUS, Constants.FAILED);
-                    linkedRow.put("error", String.join(", ", validationErrors));
-                    errorLogs.add(linkedRow);
-                    hasFailures = true;
-                }
-            }
-        }
-        List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>(successLogs);
-        combinedLogs.addAll(errorLogs);
-
-        // Write logs to a local file
-        String logFileName = fileName + "_" + partnerCode + "_log.txt";
-        File logFile = writeLogsToFile(combinedLogs, logFileName);
-        log.info("Log file created locally at: {}", logFile.getAbsolutePath());
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("logFile", logFile);
-        result.put("hasFailures", hasFailures);
-        return result;
-    }
-
-    public File writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
-        log.info("Logs written to file: {}", originalFileName);
-        String csvFileName = originalFileName + "_log.csv";
-        String tempDir = System.getProperty("java.io.tmpdir");
-        String csvFilePath = tempDir + File.separator + csvFileName;
-        File logFile = new File(csvFilePath);
-        if (!logFile.exists()) {
-            logFile.getParentFile().mkdirs();
-            logFile.createNewFile();
-        }
-        try (FileWriter writer = new FileWriter(csvFilePath)) {
-            if (!logs.isEmpty()) {
-                LinkedHashMap<String, String> firstLog = logs.get(0);
-                StringBuilder header = new StringBuilder();
-                for (String key : firstLog.keySet()) {
-                    header.append(escapeSpecialCharacters(key)).append(" | ");
-                }
-                header.append(Constants.TIME);
-                writer.write(header.toString());
-                writer.write(System.lineSeparator());
-                for (LinkedHashMap<String, String> logEntry : logs) {
-                    StringBuilder row = new StringBuilder();
-                    for (String key : firstLog.keySet()) {
-                        row.append(escapeSpecialCharacters(logEntry.getOrDefault(key, ""))).append(" | ");
-                    }
-                    String timestamp = new Timestamp(System.currentTimeMillis()).toString();
-                    row.append(timestamp);
-                    writer.write(row.toString());
-                    writer.write(System.lineSeparator());
-                }
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return logFile;
-    }
-
-    private String escapeSpecialCharacters(String value) {
-        String escapedValue = value;
-        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
-            escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return escapedValue;
-    }
-
     private boolean isValidFileFormat(String fileName) {
         if (fileName == null) {
             return false;
