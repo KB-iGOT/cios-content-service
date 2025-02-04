@@ -67,43 +67,13 @@ public class CassandraOperationImpl implements CassandraOperation {
         return select;
     }
 
-    /*private Select processQueryWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap,
-                                                List<String> fields) {
-        Select selectQuery = null;
-        Builder selectBuilder;
-        if (CollectionUtils.isNotEmpty(fields)) {
-            String[] dbFields = fields.toArray(new String[fields.size()]);
-            selectBuilder = QueryBuilder.select(dbFields);
-        } else {
-            selectBuilder = QueryBuilder.select().all();
-        }
-        selectQuery = selectBuilder.from(keyspaceName, tableName);
-        if (MapUtils.isNotEmpty(propertyMap)) {
-            Where selectWhere = selectQuery.where();
-            for (Entry<String, Object> entry : propertyMap.entrySet()) {
-                if (entry.getValue() instanceof List) {
-                    List<Object> list = (List) entry.getValue();
-                    if (null != list) {
-                        Object[] propertyValues = list.toArray(new Object[list.size()]);
-                        Clause clause = QueryBuilder.in(entry.getKey(), propertyValues);
-                        selectWhere.and(clause);
-                    }
-                } else {
-                    Clause clause = QueryBuilder.eq(entry.getKey(), entry.getValue());
-                    selectWhere.and(clause);
-                }
-            }
-        }
-        return selectQuery;
-    }*/
-
     @Override
     public Object insertRecord(String keyspaceName, String tableName, Map<String, Object> request) {
         ApiResponse response = new ApiResponse();
-
+        CqlSession session = null;
         try {
             String query = CassandraUtil.getPreparedStatement(keyspaceName, tableName, request);
-            CqlSession session = connectionManager.getSession(keyspaceName);
+            session = connectionManager.getSession(keyspaceName);
             PreparedStatement statement = session.prepare(query);
             BoundStatement boundStatement = statement.bind(request.values().toArray());
             session.execute(boundStatement);
@@ -119,16 +89,17 @@ public class CassandraOperationImpl implements CassandraOperation {
 
     @Override
     public List<Map<String, Object>> getRecordsByPropertiesWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap, List<String> fields, Integer limit) {
-
         List<Map<String, Object>> response = new ArrayList<>();
+        CqlSession session = null;
         try {
+            session = connectionManager.getSession(keyspaceName);
             Select selectQuery = null;
             selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
 
             if (limit != null) selectQuery = selectQuery.limit(limit);
             String queryString = selectQuery.toString();
             SimpleStatement statement = SimpleStatement.newInstance(queryString);
-            ResultSet results = connectionManager.getSession(keyspaceName).execute(statement);
+            ResultSet results = session.execute(statement);
             response = CassandraUtil.createResponse(results);
         } catch (Exception e) {
             logger.error(Constants.EXCEPTION_MSG_FETCH + tableName + " : " + e.getMessage(), e);
@@ -140,8 +111,9 @@ public class CassandraOperationImpl implements CassandraOperation {
     public Map<String, Object> updateRecord(String keyspaceName, String tableName, Map<String, Object> updateAttributes,
                                             Map<String, Object> compositeKey) {
         Map<String, Object> response = new HashMap<>();
+        CqlSession session =null;
         try {
-            CqlSession session = connectionManager.getSession(keyspaceName);
+            session = connectionManager.getSession(keyspaceName);
             UpdateStart updateStart = com.datastax.oss.driver.api.querybuilder.QueryBuilder.update(keyspaceName, tableName);
             UpdateWithAssignments updateWithAssignments = updateStart.set(
                     updateAttributes.entrySet().stream()
@@ -170,11 +142,14 @@ public class CassandraOperationImpl implements CassandraOperation {
                                                             Map<String, Object> propertyMap, List<String> fields) {
         Select selectQuery = null;
         List<Map<String, Object>> response = new ArrayList<>();
+        CqlSession session = null;
         try {
+            session = connectionManager.getSession(keyspaceName);
             selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
-            ResultSet results = connectionManager.getSession(keyspaceName).execute((Statement<?>) selectQuery);
+            String queryString = selectQuery.toString();
+            SimpleStatement statement = SimpleStatement.newInstance(queryString);
+            ResultSet results = session.execute(statement);
             response = CassandraUtil.createResponse(results);
-
         } catch (Exception e) {
             logger.error(Constants.EXCEPTION_MSG_FETCH + tableName + " : " + e.getMessage(), e);
         }

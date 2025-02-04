@@ -69,8 +69,6 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Value("${search.result.redis.ttl}")
     private long searchResultRedisTtl;
     @Autowired
-    private RedisTemplate<String, SearchResult> redisTemplate;
-    @Autowired
     private StoreFileToGCP storeFileToGCP;
     @Autowired
     private CbServerProperties cbServerProperties;
