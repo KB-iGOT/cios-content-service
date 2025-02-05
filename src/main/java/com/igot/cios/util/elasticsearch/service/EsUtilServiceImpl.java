@@ -146,6 +146,7 @@ public class EsUtilServiceImpl implements EsUtilService {
                 }
             }
             SearchRequest searchRequest = searchRequestBuilder.build();
+            log.info("Final search query: {}", searchRequest.toString());
             SearchResponse<Object> paginatedSearchResponse =
                     elasticsearchClient.search(searchRequest, Object.class);
             List<Map<String, Object>> paginatedResult = extractPaginatedResult(paginatedSearchResponse);
@@ -208,7 +209,6 @@ public class EsUtilServiceImpl implements EsUtilService {
         addFacetsToSearchSourceBuilder(searchCriteria.getFacets(), searchSourceBuilder);
         Query queryPart = buildQueryPart(searchCriteria.getQuery());
         boolQueryBuilder.must(queryPart);
-        log.info("final search query result {}", searchSourceBuilder);
         return searchSourceBuilder;
     }
 
@@ -224,7 +224,10 @@ public class EsUtilServiceImpl implements EsUtilService {
                         } else if (value instanceof Boolean) {
                             boolQueries.add(Query.of(q ->q.term(t->t.field(field).value((boolean)value))));
                         } else if (value instanceof ArrayList) {
-                            boolQueryBuilder.must(Query.of(q -> q.terms(t -> t.field(field + Constants.KEYWORD).terms((TermsQueryField) value))));
+                            List<FieldValue> termsList = ((ArrayList<String>) value).stream()
+                                    .map(FieldValue::of)
+                                    .collect(Collectors.toList());
+                            boolQueryBuilder.must(Query.of(q -> q.terms(t -> t.field(field + Constants.KEYWORD).terms(terms -> terms.value(termsList)))));
                         } else if (value instanceof String) {
                             boolQueryBuilder.must(Query.of(q -> q.terms(t ->
                                     t.field(field + Constants.KEYWORD)
@@ -270,8 +273,8 @@ public class EsUtilServiceImpl implements EsUtilService {
                             }
                         }
                     });
-                mustNotQueries.forEach(mustNotQuery -> boolQueryBuilder.mustNot(mustNotQuery));
-                boolQueries.forEach(boolQuery -> boolQueryBuilder.must(boolQuery));
+            mustNotQueries.forEach(mustNotQuery -> boolQueryBuilder.mustNot(mustNotQuery));
+            boolQueries.forEach(boolQuery -> boolQueryBuilder.must(boolQuery));
         }
         return boolQueryBuilder;
     }
