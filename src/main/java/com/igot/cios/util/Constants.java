@@ -107,6 +107,8 @@ public class Constants {
     public static final String DURATION = "duration";
     public static final String USER_ID = "userid";
     public static final String DRAFT = "draft";
+    public static final String ERROR_KEY = "error";
+    public static final String LOG_TEXT = "_log.txt";
 
 
     private Constants() {

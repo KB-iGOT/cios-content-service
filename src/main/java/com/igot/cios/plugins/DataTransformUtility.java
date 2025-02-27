@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.igot.cios.dto.LogStatus;
 import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
@@ -66,10 +67,7 @@ public class DataTransformUtility {
     private CornellContentRepository cornellContentRepository;
 
     @Autowired
-    private StoreFileToGCP storeFileToGCP;
-
-    @Autowired
-    private CiosContentServiceImpl ciosContentServiceimpl;
+    private LogStatus logStatus;
 
     private List<Map<String, String>> processSheetAndSendMessage(Sheet sheet) {
         log.info("CiosContentServiceImpl::processSheetAndSendMessage");
@@ -297,7 +295,7 @@ public class DataTransformUtility {
             for (ValidationMessage message : validationMessages) {
                 errorMessage.append(message.getMessage()).append("\n");
             }
-            log.error("Validation Error", errorMessage.toString());
+            log.error("Validation Error", errorMessage);
             throw new CiosContentException("Validation Error", errorMessage.toString(), HttpStatus.BAD_REQUEST);
         }
     }
@@ -323,12 +321,12 @@ public class DataTransformUtility {
         return fileId;
     }
 
-    public List<String> validateRowData(Map<String, String> row, JsonNode schemaNode) {
+    public List<String> validateRowData(String fileName,JsonNode rowNode) {
         List<String> invalidErrList = new ArrayList<>();
         try {
-            JsonNode rowNode = objectMapper.convertValue(row, JsonNode.class);
             JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance();
-            JsonSchema schema = schemaFactory.getSchema(schemaNode);
+            InputStream schemaStream = schemaFactory.getClass().getResourceAsStream(fileName);
+            JsonSchema schema = schemaFactory.getSchema(schemaStream);
             if (rowNode.isArray()) {
                 for (JsonNode objectNode : rowNode) {
                     validateRowDataObject(schema, objectNode, invalidErrList);
@@ -351,11 +349,14 @@ public class DataTransformUtility {
         }
     }
 
-    public void updateProcessedDataInDb(JsonNode transformData, String partnerCode, String fileName, String fileId,String partnerId) {
+    public Map<String,Object> updateProcessedDataInDb(List<Map<String, String>> transformData, String partnerCode, String fileName, String fileId,String partnerId,List<Object> transformContentJson) {
+        log.info("DataTransformUtility :: updateProcessedDataInDb");
         try {
-            List<CornellContentEntity> cornellContentEntityList = new ArrayList<>();
-            transformData.forEach(eachContentData -> {
-                Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            logStatus.clearLogs();
+            ArrayNode transformedDataArray = JsonNodeFactory.instance.arrayNode();
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            transformData.forEach(transformedData -> {
+                JsonNode eachContentData = transformData(transformedData, transformContentJson);
                 if (eachContentData != null &&
                         eachContentData.path(Constants.CONTENT) != null &&
                         eachContentData.path(Constants.CONTENT).get(Constants.DURATION) != null) {
@@ -373,13 +374,9 @@ public class DataTransformUtility {
                 ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.ACTIVE, Constants.ACTIVE_STATUS).asText();
                 ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.PUBLISHED_ON, "0000-00-00 00:00:00").asText();
                 ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.PARTNER_ID, partnerId).asText();
-                validatePayload(Constants.DATA_PAYLOAD_VALIDATION_FILE, eachContentData);
-                addSearchTags(eachContentData);
-                String externalId = eachContentData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
-                CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, eachContentData, eachContentData, currentTime, fileId, partnerId, partnerCode);
-                cornellContentEntityList.add(cornellContentEntity);
+                transformedDataArray.add(eachContentData);
             });
-            cornellBulkSave(cornellContentEntityList, partnerCode);
+            return validatePayloadAndWriteLogsToFile(Constants.DATA_PAYLOAD_VALIDATION_FILE, transformedDataArray, fileName, partnerCode, fileId, partnerId,currentTime);
         }catch (Exception e){
             log.error("Error while updating processed data in DB", e);
             throw new CiosContentException("Error while updating processed data in DB", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -421,15 +418,14 @@ public class DataTransformUtility {
             externalContent.setUpdatedDate(currentTime);
             externalContent.setSourceData(rawContentData);
             externalContent.setFileId(fileId);
-            externalContent.setPartnerId(fileId);
             externalContent.setPartnerId(partnerId);
             externalContent.setPartnerCode((partnerCode));
             return externalContent;
         }
     }
 
-    private void cornellBulkSave(List<CornellContentEntity> cornellContentEntityList, String partnerCode) {
-        log.info("DataTransformUtility :: cornellBulkSave");
+    private void dataBulkSave(List<CornellContentEntity> cornellContentEntityList, String partnerCode) {
+        log.info("DataTransformUtility :: dataBulkSave");
         cornellContentRepository.saveAll(cornellContentEntityList);
         cornellContentEntityList.forEach(contentEntity -> {
             try {
@@ -443,7 +439,6 @@ public class DataTransformUtility {
                         entityMap,
                         cbServerProperties.getElasticCiosContentJsonPath()
                 );
-                //log.info("Added data to ES document for externalId: {}", contentEntity.getExternalId());
             } catch (Exception e) {
                 log.error("Error while processing contentEntity with externalId: {}", contentEntity.getExternalId(), e);
             }
@@ -499,40 +494,32 @@ public class DataTransformUtility {
             String partnerCode,
             String loadContentErrorMessage,
             String partnerId) throws IOException {
-        List<Map<String, String>> successProcessedData=new ArrayList<>();
 
+        Map<String, Object> result = new HashMap<>();
         log.info("Starting row validation and log generation for file: {}", fileName);
-        List<LinkedHashMap<String, String>> successLogs = new ArrayList<>();
-        List<LinkedHashMap<String, String>> errorLogs = new ArrayList<>();
-        boolean hasFailures = false;
-
         JsonNode contentPartnerResponse = fetchPartnerInfoUsingApi(partnerCode);
-        JsonNode fileValidation = contentPartnerResponse.path("contentFileValidation");
         JsonNode jsonData = contentPartnerResponse.path("trasformContentJson");
         if (loadContentErrorMessage != null) {
+            logStatus.clearLogs();
             LinkedHashMap<String, String> loadContentErrorLog = new LinkedHashMap<>();
             loadContentErrorLog.put(Constants.FILE_ID, fileId);
             loadContentErrorLog.put(Constants.FILE_NAME, fileName);
             loadContentErrorLog.put(Constants.STATUS, Constants.FAILED);
-            loadContentErrorLog.put("error", loadContentErrorMessage);
-            errorLogs.add(loadContentErrorLog);
-            hasFailures = true;
+            loadContentErrorLog.put(Constants.ERROR_KEY, loadContentErrorMessage);
+            logStatus.getErrorLogs().add(loadContentErrorLog);
+            logStatus.setHasFailures(true);
+            String logFileName = fileName + "_" + partnerCode + Constants.LOG_TEXT;
+            File logFile = writeLogsToFile(logStatus.getErrorLogs(), logFileName);
+            result.put(Constants.LOG_FILE, logFile);
+            result.put(Constants.HAS_FAILURES, logStatus.isHasFailures());
+            return result;
         } else {
             List<Object> transformContentJson = objectMapper.convertValue(
                     jsonData,
                     new TypeReference<List<Object>>() {
                     });
-            if (fileValidation == null || fileValidation.isMissingNode() || fileValidation.isEmpty()){
-                log.error("File validation not found for partner: {}", partnerCode);
-                loadContentErrorMessage = "File validation is missing, please update in contentPartner: " + partnerCode;
-                LinkedHashMap<String, String> validationErrorLog = new LinkedHashMap<>();
-                validationErrorLog.put(Constants.FILE_ID, fileId);
-                validationErrorLog.put(Constants.FILE_NAME, fileName);
-                validationErrorLog.put(Constants.STATUS, Constants.FAILED);
-                validationErrorLog.put("error", loadContentErrorMessage);
-                errorLogs.add(validationErrorLog);
-                hasFailures = true;
-            } else if (transformContentJson == null || transformContentJson.isEmpty()) {
+            if (transformContentJson == null || transformContentJson.isEmpty()) {
+                logStatus.clearLogs();
                 log.error("trasformContentJson is missing, please update in contentPartner for partner {}", partnerCode);
                 loadContentErrorMessage = "trasformContentJson is missing, please update in contentPartner: " + partnerCode;
                 LinkedHashMap<String, String> transformErrorLog = new LinkedHashMap<>();
@@ -540,48 +527,63 @@ public class DataTransformUtility {
                 transformErrorLog.put(Constants.FILE_NAME, fileName);
                 transformErrorLog.put(Constants.STATUS, Constants.FAILED);
                 transformErrorLog.put("error", loadContentErrorMessage);
-                errorLogs.add(transformErrorLog);
-                hasFailures = true;
+                logStatus.getErrorLogs().add(transformErrorLog);
+                logStatus.setHasFailures(true);
+                String logFileName = fileName + "_" + partnerCode + Constants.LOG_TEXT;
+                File logFile = writeLogsToFile(logStatus.getErrorLogs(), logFileName);
+                result.put(Constants.LOG_FILE, logFile);
+                result.put(Constants.HAS_FAILURES, logStatus.isHasFailures());
+                return result;
             } else {
-                for (Map<String, String> row : processedData) {
-                    LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
-                    List<String> validationErrors = validateRowData(linkedRow, fileValidation);
-                    if (validationErrors.isEmpty()) {
-                        linkedRow.put(Constants.STATUS, Constants.SUCCESS);
-                        linkedRow.put("error", "");
-                        successLogs.add(linkedRow);
-                        successProcessedData.add(row);
-                    } else {
-                        linkedRow.put(Constants.STATUS, Constants.FAILED);
-                        linkedRow.put("error", String.join(", ", validationErrors));
-                        errorLogs.add(linkedRow);
-                        hasFailures = true;
-                    }
-                }
-                if (!successProcessedData.isEmpty()) {
-                    ArrayNode transformedDataArray = JsonNodeFactory.instance.arrayNode();
-                    for (Map<String, String> row : successProcessedData) {
-                        JsonNode transformedData = transformData(row, transformContentJson);
-                        if (transformedData != null) {
-                            transformedDataArray.add(transformedData);
-                        }
-                    }
-                    updateProcessedDataInDb(transformedDataArray, partnerCode, fileName, fileId, partnerId);
-                }
+                result = updateProcessedDataInDb(processedData, partnerCode, fileName, fileId, partnerId,transformContentJson);
             }
         }
-        List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>(successLogs);
-        combinedLogs.addAll(errorLogs);
-
-        // Write logs to a local file
-        String logFileName = fileName + "_" + partnerCode + "_log.txt";
-        File logFile = writeLogsToFile(combinedLogs, logFileName);
-        log.info("Log file created locally at: {}", logFile.getAbsolutePath());
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("logFile", logFile);
-        result.put("hasFailures", hasFailures);
         return result;
+    }
+
+    public Map<String, Object> validatePayloadAndWriteLogsToFile(String dataPayloadValidationFile, JsonNode transformData, String fileName, String partnerCode,String fileId,String partnerId,Timestamp currentTime){
+        log.info("DataTransformUtility :: validatePayloadAndWriteLogsToFile");
+        List<CornellContentEntity> cornellContentEntityList = new ArrayList<>();
+        try {
+            transformData.forEach(transformedData -> {
+                JsonNode contentNode = transformedData.get("content");
+                Map<String, String> row = objectMapper.convertValue(contentNode, new TypeReference<Map<String, String>>() {
+                });
+                LinkedHashMap<String, String> linkedRow = new LinkedHashMap<>(row);
+                List<String> validationErrors = validateRowData(dataPayloadValidationFile, transformedData);
+                if (validationErrors.isEmpty()) {
+                    linkedRow.put(Constants.STATUS, Constants.SUCCESS);
+                    linkedRow.put("error", "");
+                    logStatus.getSuccessLogs().add(linkedRow);
+                    addSearchTags(transformedData);
+                    String externalId = transformedData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
+                    CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformedData, transformedData, currentTime, fileId, partnerId, partnerCode);
+                    cornellContentEntityList.add(cornellContentEntity);
+                } else {
+                    linkedRow.put(Constants.STATUS, Constants.FAILED);
+                    linkedRow.put("error", String.join(", ", validationErrors));
+                    logStatus.getErrorLogs().add(linkedRow);
+                    logStatus.setHasFailures(true);
+                }
+            });
+            log.info("Data validation completed for file: {}", fileName);
+            dataBulkSave(cornellContentEntityList, partnerCode);
+            List<LinkedHashMap<String, String>> combinedLogs = new ArrayList<>(logStatus.getSuccessLogs());
+            combinedLogs.addAll(logStatus.getErrorLogs());
+
+            // Write logs to a local file
+            String logFileName = fileName + "_" + partnerCode + Constants.LOG_TEXT;
+            File logFile = writeLogsToFile(combinedLogs, logFileName);
+            log.info("Log file created locally at: {}", logFile.getAbsolutePath());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put(Constants.LOG_FILE, logFile);
+            result.put(Constants.HAS_FAILURES, logStatus.isHasFailures());
+            return result;
+        } catch (Exception e) {
+            log.error("Error while validating payload for file: {}", fileName, e);
+            throw new RuntimeException(e);
+        }
     }
 
     public File writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
