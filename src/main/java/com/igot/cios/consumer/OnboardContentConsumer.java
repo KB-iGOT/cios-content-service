@@ -33,10 +33,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Component
 @Slf4j
 public class OnboardContentConsumer {
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -55,25 +58,18 @@ public class OnboardContentConsumer {
     @Autowired
     DataTransformUtility dataTransformUtility;
 
-    private String cachedPartnerCode = null;
-    private List<Object> cachedContentJson = null;
-    private long cacheTimestamp = 0;
-
     @KafkaListener(topics = "${kafka.topic.content.onboarding}", groupId = "${content.onboarding.consumer.group}")
     public void consumeMessage(String message) {
-        CompletableFuture.runAsync(() -> {
             try {
                 log.info("Received message to process: {}", message);
                 if (StringUtils.isNoneBlank(message)) {
-                    // Call the asynchronous processing method
-                    processOnboardingContent(message);
+                    executorService.submit(() -> processOnboardingContent(message));
                 } else {
                     log.error("Error in consuming message: Invalid content");
                 }
             } catch (Exception e) {
                 log.error("Error in consumeMessage: {}", e.getMessage(), e);
             }
-        });
     }
 
     public void processOnboardingContent(String message) {
@@ -90,8 +86,6 @@ public class OnboardContentConsumer {
             log.info("Consuming the content to onboard in cios");
             Map<String, Object> receivedMessage = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {
             });
-            log.info("Received {} records from Kafka", receivedMessage.size());
-
             partnerCode = (String) receivedMessage.get(Constants.PARTNER_CODE);
             fileName = (String) receivedMessage.get(Constants.FILE_NAME);
             initiatedOn = objectMapper.convertValue(receivedMessage.get(Constants.INITIATED_ON), Timestamp.class);
