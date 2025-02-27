@@ -1,11 +1,9 @@
 package com.igot.cios.consumer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.entity.FileInfoEntity;
-import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.service.impl.CiosContentServiceImpl;
@@ -16,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.mock.web.MockMultipartFile;
@@ -32,7 +29,6 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -42,9 +38,6 @@ public class OnboardContentConsumer {
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private CiosContentServiceImpl ciosContentServiceimpl;
 
     @Autowired
     private FileInfoRepository fileInfoRepository;
@@ -98,14 +91,15 @@ public class OnboardContentConsumer {
                 contentUploadedGCPFileName = fileInfoEntity.getContentUploadedGCPFileName();
             }
 
-            ResponseEntity<?> response = gcpBucket.downloadCiosContentFile(contentUploadedGCPFileName);
-            if (!response.getStatusCode().is2xxSuccessful() || !(response.getBody() instanceof ByteArrayResource)) {
-                log.error("Failed to download file: {}", contentUploadedGCPFileName);
-                return;
+            if (contentUploadedGCPFileName != null && !contentUploadedGCPFileName.isEmpty()) {
+                ResponseEntity<?> response = gcpBucket.downloadCiosContentFile(contentUploadedGCPFileName);
+                if (!response.getStatusCode().is2xxSuccessful() || !(response.getBody() instanceof ByteArrayResource)) {
+                    log.error("Failed to download file: {}", contentUploadedGCPFileName);
+                    return;
+                }
+                tmpPath = Paths.get(Constants.LOCAL_BASE_PATH + contentUploadedGCPFileName);
+                Files.write(tmpPath, ((ByteArrayResource) response.getBody()).getByteArray());
             }
-
-            tmpPath = Paths.get(Constants.LOCAL_BASE_PATH + contentUploadedGCPFileName);
-            Files.write(tmpPath, ((ByteArrayResource) response.getBody()).getByteArray());
             MultipartFile tempFile = new MockMultipartFile(
                     contentUploadedGCPFileName,
                     contentUploadedGCPFileName,
