@@ -1,11 +1,9 @@
 package com.igot.cios.consumer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.entity.FileInfoEntity;
-import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.repository.FileInfoRepository;
 import com.igot.cios.service.impl.CiosContentServiceImpl;
@@ -16,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.mock.web.MockMultipartFile;
@@ -32,16 +29,15 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Component
 @Slf4j
 public class OnboardContentConsumer {
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private CiosContentServiceImpl ciosContentServiceimpl;
 
     @Autowired
     private FileInfoRepository fileInfoRepository;
@@ -55,25 +51,18 @@ public class OnboardContentConsumer {
     @Autowired
     DataTransformUtility dataTransformUtility;
 
-    private String cachedPartnerCode = null;
-    private List<Object> cachedContentJson = null;
-    private long cacheTimestamp = 0;
-
     @KafkaListener(topics = "${kafka.topic.content.onboarding}", groupId = "${content.onboarding.consumer.group}")
     public void consumeMessage(String message) {
-        CompletableFuture.runAsync(() -> {
             try {
                 log.info("Received message to process: {}", message);
                 if (StringUtils.isNoneBlank(message)) {
-                    // Call the asynchronous processing method
-                    processOnboardingContent(message);
+                    executorService.submit(() -> processOnboardingContent(message));
                 } else {
                     log.error("Error in consuming message: Invalid content");
                 }
             } catch (Exception e) {
                 log.error("Error in consumeMessage: {}", e.getMessage(), e);
             }
-        });
     }
 
     public void processOnboardingContent(String message) {
@@ -90,8 +79,6 @@ public class OnboardContentConsumer {
             log.info("Consuming the content to onboard in cios");
             Map<String, Object> receivedMessage = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {
             });
-            log.info("Received {} records from Kafka", receivedMessage.size());
-
             partnerCode = (String) receivedMessage.get(Constants.PARTNER_CODE);
             fileName = (String) receivedMessage.get(Constants.FILE_NAME);
             initiatedOn = objectMapper.convertValue(receivedMessage.get(Constants.INITIATED_ON), Timestamp.class);
@@ -104,14 +91,15 @@ public class OnboardContentConsumer {
                 contentUploadedGCPFileName = fileInfoEntity.getContentUploadedGCPFileName();
             }
 
-            ResponseEntity<?> response = gcpBucket.downloadCiosContentFile(contentUploadedGCPFileName);
-            if (!response.getStatusCode().is2xxSuccessful() || !(response.getBody() instanceof ByteArrayResource)) {
-                log.error("Failed to download file: {}", contentUploadedGCPFileName);
-                return;
+            if (contentUploadedGCPFileName != null && !contentUploadedGCPFileName.isEmpty()) {
+                ResponseEntity<?> response = gcpBucket.downloadCiosContentFile(contentUploadedGCPFileName);
+                if (!response.getStatusCode().is2xxSuccessful() || !(response.getBody() instanceof ByteArrayResource)) {
+                    log.error("Failed to download file: {}", contentUploadedGCPFileName);
+                    return;
+                }
+                tmpPath = Paths.get(Constants.LOCAL_BASE_PATH + contentUploadedGCPFileName);
+                Files.write(tmpPath, ((ByteArrayResource) response.getBody()).getByteArray());
             }
-
-            tmpPath = Paths.get(Constants.LOCAL_BASE_PATH + contentUploadedGCPFileName);
-            Files.write(tmpPath, ((ByteArrayResource) response.getBody()).getByteArray());
             MultipartFile tempFile = new MockMultipartFile(
                     contentUploadedGCPFileName,
                     contentUploadedGCPFileName,
