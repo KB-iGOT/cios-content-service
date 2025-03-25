@@ -434,7 +434,6 @@ public class DataTransformUtility {
                 String uniqueId = partnerCode + "_" + contentEntity.getExternalId();
                 esUtilService.addDocument(
                         Constants.CIOS_CONTENT_INDEX_NAME,
-                        Constants.INDEX_TYPE,
                         uniqueId,
                         entityMap,
                         cbServerProperties.getElasticCiosContentJsonPath()
