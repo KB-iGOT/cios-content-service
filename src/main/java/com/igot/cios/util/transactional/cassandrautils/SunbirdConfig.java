@@ -48,9 +48,13 @@ public class SunbirdConfig extends CassandraConfig {
 	public CqlSession cqlSession() {
 		logger.info("Creating CqlSession for keyspace: {}", getKeyspaceName());
 
-		CqlSessionBuilder builder = CqlSession.builder()
-				.addContactPoint(new InetSocketAddress(contactPoints, Integer.parseInt(port)))
-				.withLocalDatacenter(Objects.requireNonNull(getLocalDataCenter()))
+		CqlSessionBuilder builder = CqlSession.builder();
+		String[] contactPoints = getContactPoints().split(",");
+
+		for (String contactPoint : contactPoints) {
+			builder.addContactPoint(new InetSocketAddress(contactPoint.trim(), getPort()));
+		}
+		builder.withLocalDatacenter(Objects.requireNonNull(getLocalDataCenter()))
 				.withKeyspace(getKeyspaceName());
 
 		if (!sunbirdUser.isEmpty() && !sunbirdPassword.isEmpty()) {
