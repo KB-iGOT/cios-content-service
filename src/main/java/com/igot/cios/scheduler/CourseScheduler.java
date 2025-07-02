@@ -18,6 +18,9 @@ public class CourseScheduler {
     @Autowired
     CourseraSchedulerService courseraSchedulerService;
 
+    @Autowired
+    CdacSchedulerService cdacSchedulerService;
+
     @Value("${scheduler.enabled}")
     private boolean schedulerEnabled;
 
@@ -37,6 +40,14 @@ public class CourseScheduler {
         if (courseraSchedulerEnabled) {
             log.info("CourseScheduler :: callCourseraEnrollmentApi");
             courseraSchedulerService.loadCourseraEnrollment();
+        }
+    }
+
+    @Scheduled(cron = "${cdac.scheduler.cron}")
+    private void callCdacEnrollmentApi() throws JsonProcessingException {
+        if (courseraSchedulerEnabled) {
+            log.info("CourseScheduler :: callCourseraEnrollmentApi");
+            cdacSchedulerService.loadCdacEnrollment();
         }
     }
 }

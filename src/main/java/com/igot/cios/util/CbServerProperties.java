@@ -97,4 +97,13 @@ public class CbServerProperties {
 
     @Value("${coursera.date.after}")
     private String courseraDateAfter;
+
+    @Value("${cdac.enrollment.service.code}")
+    private String cdacEnrollmentServiceCode;
+
+    @Value("${cdac.api.key}")
+    public String cdacApiKey;
+
+    @Value("${cdac.partner.code}")
+    public String cdacPartnerCode;
 }
