@@ -54,7 +54,7 @@ public class CdacSchedulerService {
         try {
             log.info("CdacSchedulerService::callEnrollmentAPI");
             String extCourseId = transformData.get(Constants.COURSEID).asText();
-            JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId,partnerId);
+            JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId, partnerId);
             String courseId = result.path(Constants.CONTENT).get(Constants.CONTENTID).asText();
             String[] parts = transformData.get(Constants.USER_ID).asText().split("@");
             ((ObjectNode) transformData).put(Constants.USER_ID, parts[0]);
@@ -114,7 +114,7 @@ public class CdacSchedulerService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-        return performEnrollmentCall(cbServerProperties.cdacPartnerCode,payload);
+        return performEnrollmentCall(cbServerProperties.cdacPartnerCode, payload);
     }
 
     private Map<String, String> formHeaderMap() {
@@ -136,7 +136,7 @@ public class CdacSchedulerService {
     }
 
     private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
-        log.info("CdacSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode,requestBody);
+        log.info("CdacSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode, requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -149,14 +149,14 @@ public class CdacSchedulerService {
         );
         if (response.getStatusCode().is2xxSuccessful()) {
             JsonNode jsonData = objectMapper.valueToTree(response.getBody());
-            if(!jsonData.isMissingNode()){
+            if (!jsonData.isMissingNode()) {
                 JsonNode contentPartnerResponse = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
                 String partnerId = contentPartnerResponse.get("id").asText();
                 jsonData.forEach(
                         eachContentData -> {
                             callEnrollmentAPI(partnerCode, partnerId, eachContentData);
                         });
-            }else{
+            } else {
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);
             }
             return jsonData;
