@@ -109,6 +109,14 @@ public class Constants {
     public static final String DRAFT = "draft";
     public static final String ERROR_KEY = "error";
     public static final String LOG_TEXT = "_log.txt";
+    public static final String COMPLETED_ON = "completedon";
+    public static final String PARTNERCODE = "partnerCode";
+    public static final String PARTNERID = "partnerId";
+    public static final String COURSEID = "courseid";
+    public static final String PROGRESS = "progress";
+    public static final String CONTENTID = "contentId";
+    public static final String FROM_DATE = "fromdate";
+    public static final String TO_DATE = "todate";
 
 
     private Constants() {
