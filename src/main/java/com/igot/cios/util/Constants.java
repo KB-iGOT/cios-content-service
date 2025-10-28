@@ -117,6 +117,7 @@ public class Constants {
     public static final String CONTENTID = "contentId";
     public static final String FROM_DATE = "fromdate";
     public static final String TO_DATE = "todate";
+    public static final String EXTERNAL_ID_ERROR = "External ID: ";
 
 
     private Constants() {
