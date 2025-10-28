@@ -70,5 +70,8 @@
   },
   "contentSearchTags": {
     "type": "keyword"
+  },
+  "accessSettingsEnabled": {
+    "type": "boolean"
   }
 }
