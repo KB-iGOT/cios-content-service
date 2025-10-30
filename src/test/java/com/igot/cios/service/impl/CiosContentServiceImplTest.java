@@ -495,39 +495,6 @@ class CiosContentServiceImplTest {
     }
 
     @Test
-    void deleteNotPublishContent_deletesEntity_whenInactiveAndNotInitiated() {
-        DeleteContentRequestDto dto = new DeleteContentRequestDto();
-        dto.setPartnerCode("P");
-        dto.setExternalId(List.of("ext1"));
-
-        CornellContentEntity entity = new CornellContentEntity();
-        entity.setExternalId("ext1");
-        entity.setIsActive(false);
-        ObjectNode ciosData = JsonNodeFactory.instance.objectNode();
-        ObjectNode content = JsonNodeFactory.instance.objectNode();
-        content.put("status", Constants.NOT_INITIATED);
-        ciosData.set("content", content);
-        entity.setCiosData(ciosData);
-
-        when(repository.findByExternalIdInAndPartnerCode(dto.getExternalId(), dto.getPartnerCode())).thenReturn(List.of(entity));
-        when(repository.countByPartnerCode(dto.getPartnerCode())).thenReturn(0L);
-
-        ObjectNode partnerInfo = JsonNodeFactory.instance.objectNode();
-        ObjectNode dataNode = JsonNodeFactory.instance.objectNode();
-        partnerInfo.set("data", dataNode);
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(dto.getPartnerCode())).thenReturn(partnerInfo);
-
-        ResponseEntity<?> resp = ciosContentService.deleteNotPublishContent(dto);
-
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
-        SBApiResponse body = (SBApiResponse) resp.getBody();
-        assertNotNull(body);
-        assertEquals(Constants.SUCCESS, body.getResult().get(Constants.STATUS));
-        verify(repository, times(1)).delete(entity);
-        verify(esUtilService, times(1)).deleteDocument((Constants.CIOS_CONTENT_INDEX_NAME), ("P_ext1"));
-    }
-
-    @Test
     void deleteNotPublishContent_handlesMissingCiosData_andReturnsBadRequest() {
         DeleteContentRequestDto dto = new DeleteContentRequestDto();
         dto.setPartnerCode("P");
@@ -597,5 +564,70 @@ class CiosContentServiceImplTest {
         CiosContentException ex = assertThrows(CiosContentException.class, () -> ciosContentService.loadContentProgressFromExcel(file, "CORNELL"));
         assertTrue(ex.getMessage().toLowerCase().contains("process error"));
         verify(kafkaProducer, never()).push(anyString(), any());
+    }
+
+    @Test
+    void deleteNotPublishContent_deletesEntity_whenInactiveAndNotInitiated() {
+        DeleteContentRequestDto dto = new DeleteContentRequestDto();
+        dto.setPartnerCode("P");
+        dto.setExternalId(List.of("ext1"));
+
+        CornellContentEntity entity = new CornellContentEntity();
+        entity.setExternalId("ext1");
+        entity.setIsActive(false);
+        ObjectNode ciosData = JsonNodeFactory.instance.objectNode();
+        ObjectNode content = JsonNodeFactory.instance.objectNode();
+        content.put("status", Constants.NOT_INITIATED);
+        ciosData.set("content", content);
+        entity.setCiosData(ciosData);
+
+        when(repository.findByExternalIdInAndPartnerCode(dto.getExternalId(), dto.getPartnerCode())).thenReturn(List.of(entity));
+        when(repository.countByPartnerCode(dto.getPartnerCode())).thenReturn(0L);
+
+        ObjectNode partnerInfo = JsonNodeFactory.instance.objectNode();
+        ObjectNode dataNode = JsonNodeFactory.instance.objectNode();
+        partnerInfo.set("data", dataNode);
+        when(dataTransformUtility.fetchPartnerInfoUsingApi(dto.getPartnerCode())).thenReturn(partnerInfo);
+
+        ResponseEntity<?> resp = ciosContentService.deleteNotPublishContent(dto);
+
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        SBApiResponse body = (SBApiResponse) resp.getBody();
+        assertNotNull(body);
+        assertEquals(Constants.SUCCESS, body.getResult().get(Constants.STATUS));
+        verify(repository, times(1)).delete(entity);
+        verify(esUtilService, times(1)).deleteDocument("P_ext1", Constants.CIOS_CONTENT_INDEX_NAME);
+    }
+
+    @Test
+    void deleteNotPublishContent_handlesMissingOrNonObjectDataNode() {
+        DeleteContentRequestDto dto = new DeleteContentRequestDto();
+        dto.setPartnerCode("P");
+        dto.setExternalId(List.of("ext1"));
+
+        CornellContentEntity entity = new CornellContentEntity();
+        entity.setExternalId("ext1");
+        entity.setIsActive(false);
+        ObjectNode ciosData = JsonNodeFactory.instance.objectNode();
+        ObjectNode content = JsonNodeFactory.instance.objectNode();
+        content.put("status", Constants.NOT_INITIATED);
+        ciosData.set("content", content);
+        entity.setCiosData(ciosData);
+
+        when(repository.findByExternalIdInAndPartnerCode(dto.getExternalId(), dto.getPartnerCode())).thenReturn(List.of(entity));
+        when(repository.countByPartnerCode(dto.getPartnerCode())).thenReturn(0L);
+
+        ObjectNode partnerInfoMissing = JsonNodeFactory.instance.objectNode();
+        when(dataTransformUtility.fetchPartnerInfoUsingApi(dto.getPartnerCode())).thenReturn(partnerInfoMissing);
+
+        ResponseEntity<?> resp1 = ciosContentService.deleteNotPublishContent(dto);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+
+        ObjectNode partnerInfoNonObject = JsonNodeFactory.instance.objectNode();
+        partnerInfoNonObject.put(Constants.DATA, "string");
+        when(dataTransformUtility.fetchPartnerInfoUsingApi(dto.getPartnerCode())).thenReturn(partnerInfoNonObject);
+
+        ResponseEntity<?> resp2 = ciosContentService.deleteNotPublishContent(dto);
+        assertEquals(HttpStatus.OK, resp2.getStatusCode());
     }
 }
