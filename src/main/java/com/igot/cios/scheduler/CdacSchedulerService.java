@@ -19,14 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestTemplate;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,11 +94,11 @@ public class CdacSchedulerService {
                     .withZone(ZoneId.of("UTC"));
             return outputFormatter.format(utcZonedDateTime);  // Format output
         } catch (RuntimeException e) {
-            throw new RuntimeException("Invalid date format: " + completedon, e);
+            throw new CiosContentException(Constants.ERROR, "Invalid date format: " + completedon, HttpStatus.BAD_REQUEST);
         }
     }
 
-    public JsonNode loadCdacEnrollment() {
+    public void loadCdacEnrollment() {
         log.info("CdacSchedulerService :: loadCdacEnrollment()");
         RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
         requestBodyDTO.setServiceCode(cbServerProperties.getCdacEnrollmentServiceCode());
@@ -112,9 +108,9 @@ public class CdacSchedulerService {
         try {
             payload = objectMapper.writeValueAsString(requestBodyDTO);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new CiosContentException(Constants.ERROR, e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        return performEnrollmentCall(cbServerProperties.cdacPartnerCode, payload);
+        performEnrollmentCall(cbServerProperties.cdacPartnerCode, payload);
     }
 
     private Map<String, String> formHeaderMap() {
@@ -124,11 +120,11 @@ public class CdacSchedulerService {
     }
 
     private Map<String, String> formUrlMapForEnrollment() {
-        DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime fromDateTime = now.minusDays(cbServerProperties.getCornellDateRange());
-        String fromdate = fromDateTime.format(FORMATTER);
-        String todate = now.format(FORMATTER);
+        String fromdate = fromDateTime.format(formatter);
+        String todate = now.format(formatter);
         Map<String, String> urlMap = new HashMap<>();
         urlMap.put(Constants.FROM_DATE, fromdate);
         urlMap.put(Constants.TO_DATE, todate);
@@ -161,7 +157,7 @@ public class CdacSchedulerService {
             }
             return jsonData;
         } else {
-            throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
+            throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId. Status code: " + response.getStatusCode(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

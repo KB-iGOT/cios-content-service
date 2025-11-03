@@ -54,12 +54,12 @@ public class CornellSchedulerService{
             String extCourseId = transformData.get("courseid").asText();
             JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId,partnerId);
             String courseId = result.path("content").get("contentId").asText();
-            String[] parts = transformData.get("userid").asText().split("@");
-            ((ObjectNode) transformData).put("userid", parts[0]);
-            String userId = transformData.get("userid").asText();
+            String[] parts = transformData.get(Constants.USER_ID).asText().split("@");
+            ((ObjectNode) transformData).put(Constants.USER_ID, parts[0]);
+            String userId = transformData.get(Constants.USER_ID).asText();
             log.info("courseId  and userid {} {}", courseId, userId);
             Map<String, Object> propertyMap = new HashMap<>();
-            propertyMap.put("userid", userId);
+            propertyMap.put(Constants.USER_ID, userId);
             propertyMap.put("courseid", courseId);
             propertyMap.put("progress", 100);
             List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
@@ -95,16 +95,16 @@ public class CornellSchedulerService{
         try {
             payload = objectMapper.writeValueAsString(requestBodyDTO);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new CiosContentException(e.getMessage(), "Error while processing request", HttpStatus.INTERNAL_SERVER_ERROR);
         }
         return performEnrollmentCall(cbServerProperties.cornellPartnerCode,payload);
     }
 
     private Map<String, String> formUrlMapForEnrollment() {
-        DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
         LocalDate today = LocalDate.now();
         LocalDate startDate = today.minusDays(cbServerProperties.getCornellDateRange()); // Adjust the range as needed
-        String completionRange = startDate.format(FORMATTER) + ":" + today.format(FORMATTER);
+        String completionRange = startDate.format(formatter) + ":" + today.format(formatter);
         log.info("Completion Range {}", completionRange);
         Map<String, String> urlMap = new HashMap<>();
         urlMap.put("offset", "0");
@@ -140,7 +140,7 @@ public class CornellSchedulerService{
             }
             return jsonData;
         } else {
-            throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
+            throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId. Status code", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

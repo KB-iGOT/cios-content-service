@@ -118,6 +118,7 @@ public class Constants {
     public static final String FROM_DATE = "fromdate";
     public static final String TO_DATE = "todate";
     public static final String EXTERNAL_ID_ERROR = "External ID: ";
+    public static final String FAILED_TO_LOAD = "Failed to upload file. Exception: ";
 
 
     private Constants() {
