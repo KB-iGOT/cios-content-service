@@ -55,7 +55,10 @@ public class StoreFileToGCP {
             String uniqueFileName = System.currentTimeMillis() + "_" + file.getName();
             tempFile = new File(System.getProperty("java.io.tmpdir"), uniqueFileName);
 
-            tempFile.createNewFile();
+            boolean created = tempFile.createNewFile();
+            if (!created && !tempFile.exists()) {
+                throw new IOException("Failed to create temporary file: " + tempFile.getAbsolutePath());
+            }
             try (FileInputStream fis = new FileInputStream(file); FileOutputStream fos = new FileOutputStream(tempFile)) {
                 byte[] buffer = new byte[1024];
                 int bytesRead;
@@ -65,14 +68,18 @@ public class StoreFileToGCP {
             }
             return uploadFile(tempFile, cloudFolderName, containerName);
         } catch (Exception e) {
-            log.error("Failed to upload file. Exception: ", e);
+            log.error(Constants.FAILED_TO_LOAD, e);
             response.getParams().setStatus(Constants.FAILED);
-            response.getParams().setErrmsg("Failed to upload file. Exception: " + e.getMessage());
+            response.getParams().setErrmsg(Constants.FAILED_TO_LOAD + e.getMessage());
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
         } finally {
             if (file != null) {
-                file.delete();
+                try {
+                    Files.deleteIfExists(file.toPath());
+                } catch (IOException e) {
+                    log.warn("Failed to delete file: {}", file.getAbsolutePath(), e);
+                }
             }
         }
     }
@@ -89,14 +96,18 @@ public class StoreFileToGCP {
             response.getResult().putAll(uploadedFile);
             return response;
         } catch (Exception e) {
-            log.error("Failed to upload file. Exception: ", e);
+            log.error(Constants.FAILED_TO_LOAD, e);
             response.getParams().setStatus(Constants.FAILED);
-            response.getParams().setErrmsg("Failed to upload file. Exception: " + e.getMessage());
+            response.getParams().setErrmsg(Constants.FAILED_TO_LOAD + e.getMessage());
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
         } finally {
             if (file != null) {
-                file.delete();
+                try {
+                    Files.deleteIfExists(file.toPath());
+                } catch (IOException e) {
+                    log.warn("Failed to delete file: {}", file.getAbsolutePath(), e);
+                }
             }
         }
     }
@@ -118,16 +129,17 @@ public class StoreFileToGCP {
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
         } finally {
-            if (tempFile != null && tempFile.exists()) {
-                boolean deleted = tempFile.delete();
-                if (!deleted) {
-                    log.warn("Failed to delete temporary file: {}", tempFile.getAbsolutePath());
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile.toPath());
+                } catch (IOException e) {
+                    log.warn("Failed to delete temporary file: {}", tempFile.getAbsolutePath(), e);
                 }
             }
         }
     }
 
-    public ResponseEntity<?> downloadCiosContentFile(String fileName) {
+    public ResponseEntity<Object> downloadCiosContentFile(String fileName) {
         Path tmpPath = Paths.get(Constants.LOCAL_BASE_PATH + fileName);
         try {
             String objectKey = cbServerProperties.getCiosContentFileCloudFolderName() + "/" + fileName;
@@ -142,13 +154,13 @@ public class StoreFileToGCP {
                     .contentType(MediaType.parseMediaType(MediaType.MULTIPART_FORM_DATA_VALUE))
                     .body(resource);
         } catch (Exception e) {
-            logger.error("Failed to read the downloaded file: " + fileName + ", Exception: ", e);
+            logger.error("Failed to read the downloaded file: {}, Exception: ", fileName, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         } finally {
             try {
                 Files.deleteIfExists(tmpPath);
             } catch (IOException e) {
-                logger.error("Failed to delete the temporary file: " + fileName + ", Exception: ", e);
+                logger.error("Failed to delete the temporary file: {}, Exception: ", fileName, e);
             }
         }
     }

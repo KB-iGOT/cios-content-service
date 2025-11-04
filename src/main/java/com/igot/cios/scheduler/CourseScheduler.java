@@ -46,7 +46,7 @@ public class CourseScheduler {
     @Scheduled(cron = "${cdac.scheduler.cron}")
     private void callCdacEnrollmentApi() throws JsonProcessingException {
         if (courseraSchedulerEnabled) {
-            log.info("CourseScheduler :: callCourseraEnrollmentApi");
+            log.info("CourseScheduler :: callCdacEnrollmentApi");
             cdacSchedulerService.loadCdacEnrollment();
         }
     }
