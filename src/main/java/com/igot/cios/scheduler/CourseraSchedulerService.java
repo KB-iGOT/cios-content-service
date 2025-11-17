@@ -107,9 +107,9 @@ public class CourseraSchedulerService {
                 Object.class
         );
         if (response.getStatusCode().is2xxSuccessful()) {
-            log.info("CourseraSchedulerService :: performEnrollmentCall response {}");
             JsonNode jsonData = objectMapper.valueToTree(response.getBody());
             if(!jsonData.isMissingNode()&&jsonData != null){
+                log.info("CourseraSchedulerService :: performEnrollmentCall response");
                 return jsonData;
             }else{
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);

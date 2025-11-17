@@ -4,9 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.igot.cios.consumer.OnboardContentConsumer;
 import com.igot.cios.dto.DeleteContentRequestDto;
 import com.igot.cios.dto.PaginatedResponse;
 import com.igot.cios.dto.RequestDto;
@@ -33,15 +31,12 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+
 import java.sql.Timestamp;
 import java.util.*;
 
@@ -72,8 +67,6 @@ public class CiosContentServiceImpl implements CiosContentService {
     private StoreFileToGCP storeFileToGCP;
     @Autowired
     private CbServerProperties cbServerProperties;
-    @Autowired
-    private OnboardContentConsumer onboardContentConsumer;
 
     @Override
     public SBApiResponse loadContentFromExcel(MultipartFile file, String partnerCode, String partnerId) {
@@ -147,7 +140,7 @@ public class CiosContentServiceImpl implements CiosContentService {
                 );
             }
         } catch (DataAccessException dae) {
-            log.error("Database access error while fetching content", dae.getMessage());
+            log.error("Database access error while fetching content {}", dae.getMessage());
             throw new CiosContentException(Constants.ERROR, "Database access error: " + dae.getMessage());
         } catch (Exception e) {
             throw new CiosContentException(Constants.ERROR, e.getMessage());
@@ -212,57 +205,77 @@ public class CiosContentServiceImpl implements CiosContentService {
     public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
         log.info("Deleting non-published content");
         SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
-        String partnerCode=deleteContentRequestDto.getPartnerCode();
+        String partnerCode = deleteContentRequestDto.getPartnerCode();
         List<String> externalIds = deleteContentRequestDto.getExternalId();
-        List<CornellContentEntity> entities = repository.findByExternalIdInAndPartnerCode(externalIds,partnerCode);
+        List<CornellContentEntity> entities = repository.findByExternalIdInAndPartnerCode(externalIds, partnerCode);
+
         List<String> errors = new ArrayList<>();
         for (String id : externalIds) {
-            Optional<CornellContentEntity> entityOpt = entities.stream()
-                    .filter(entity -> entity.getExternalId().equals(id))
-                    .findFirst();
-            if (entityOpt.isPresent()) {
+            Optional<CornellContentEntity> entityOpt = findEntityByExternalId(entities, id);
+            if (entityOpt.isEmpty()) {
+                errors.add(Constants.EXTERNAL_ID_ERROR + id + " does not exist.");
+            } else {
                 CornellContentEntity entity = entityOpt.get();
-                if (entity.getIsActive()) {
-                    errors.add("External ID: " + id + " is live, cannot delete.");
+                if (Boolean.TRUE.equals(entity.getIsActive())) {
+                    errors.add(Constants.EXTERNAL_ID_ERROR + id + " is live, cannot delete.");
                 } else {
-                    JsonNode ciosData = entity.getCiosData(); // Assuming this getter method exists
-                    if (ciosData != null && ciosData.path("content").has("status")) {
-                        String status = ciosData.path("content").get("status").asText();
-                        if (Constants.NOT_INITIATED.equalsIgnoreCase(status) || Constants.DRAFT.equalsIgnoreCase(status)) {
-                            repository.delete(entity);
-                            String uniqueId = deleteContentRequestDto.getPartnerCode() + "_" + entity.getExternalId();
-                            esUtilService.deleteDocument(uniqueId, Constants.CIOS_CONTENT_INDEX_NAME);
-                        } else {
-                            errors.add("External ID: " + id + " cannot be deleted because its status is not 'notInitiated'.");
-                        }
-                    } else {
-                        errors.add("External ID: " + id + " does not have a valid status in ciosData.");
+                    String error = handleDeletionIfAllowed(entity, deleteContentRequestDto);
+                    if (error != null) {
+                        errors.add(error);
                     }
                 }
-            } else {
-                errors.add("External ID: " + id + " does not exist.");
             }
-
         }
+
         Long totalCourseCount = repository.countByPartnerCode(partnerCode);
         JsonNode contentPartnerResponse = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
         JsonNode data = contentPartnerResponse.path(Constants.DATA);
+        if (data.isMissingNode() || !data.isObject()) {
+            ObjectNode dataNode = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            ((ObjectNode) contentPartnerResponse).set(Constants.DATA, dataNode);
+            data = dataNode;
+        }
         ((ObjectNode) data).put(Constants.TOTAL_COURSES_COUNT, totalCourseCount);
         dataTransformUtility.updatingPartnerInfo(contentPartnerResponse);
+
         if (!errors.isEmpty()) {
             log.error("Validation errors: {}", errors);
-            return buildErrorResponse(response, HttpStatus.BAD_REQUEST, String.join("\n", errors));
+            return buildErrorResponse(response, String.join("\n", errors));
         }
         response.getResult().put(Constants.STATUS, Constants.SUCCESS);
         response.getResult().put(Constants.MESSAGE, "Content deleted successfully.");
         return ResponseEntity.ok(response);
     }
 
-    private ResponseEntity<?> buildErrorResponse(SBApiResponse response, HttpStatus status, String errorMessage) {
+    private Optional<CornellContentEntity> findEntityByExternalId(List<CornellContentEntity> entities, String externalId) {
+        return entities.stream()
+                .filter(e -> externalId.equals(e.getExternalId()))
+                .findFirst();
+    }
+
+    private String handleDeletionIfAllowed(CornellContentEntity entity, DeleteContentRequestDto dto) {
+        JsonNode ciosData = entity.getCiosData();
+        if (ciosData == null || !ciosData.path(Constants.CONTENT).has("status")) {
+            return "External ID: " + entity.getExternalId() + " does not have a valid status in ciosData.";
+        }
+
+        String status = ciosData.path(Constants.CONTENT).get("status").asText();
+        boolean canDelete = Constants.NOT_INITIATED.equalsIgnoreCase(status) || Constants.DRAFT.equalsIgnoreCase(status);
+        if (canDelete) {
+            repository.delete(entity);
+            String uniqueId = dto.getPartnerCode() + "_" + entity.getExternalId();
+            esUtilService.deleteDocument(uniqueId, Constants.CIOS_CONTENT_INDEX_NAME);
+            return null;
+        } else {
+            return "External ID: " + entity.getExternalId() + " cannot be deleted because its status is not 'notInitiated'.";
+        }
+    }
+
+    private ResponseEntity<?> buildErrorResponse(SBApiResponse response, String errorMessage) {
         response.getParams().setStatus(Constants.FAILED);
         response.getParams().setErr(errorMessage);
-        response.setResponseCode(status);
-        return ResponseEntity.status(status).body(response);
+        response.setResponseCode(HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
     @Override
     public Object readContentByExternalId(String partnercode, String externalid) {
@@ -278,8 +291,7 @@ public class CiosContentServiceImpl implements CiosContentService {
     public SearchResult searchContent(SearchCriteria searchCriteria) {
         log.info("CiosContentServiceImpl::searchCotent");
         try {
-            SearchResult searchResult = esUtilService.searchDocuments(Constants.CIOS_CONTENT_INDEX_NAME, searchCriteria);
-            return searchResult;
+            return esUtilService.searchDocuments(Constants.CIOS_CONTENT_INDEX_NAME, searchCriteria);
         } catch (Exception e) {
             throw new CiosContentException("ERROR", e.getMessage(), HttpStatus.BAD_REQUEST);
         }
@@ -288,11 +300,11 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public Object updateContent(JsonNode jsonNode) {
         log.info("CiosContentServiceImpl::updateContent");
-        String partnerCode = jsonNode.path("content").get("contentPartner").get("partnerCode").asText();
-        String partnerId = jsonNode.path("content").get("contentPartner").get("id").asText();
+        String partnerCode = jsonNode.path(Constants.CONTENT).get("contentPartner").get("partnerCode").asText();
+        String partnerId = jsonNode.path(Constants.CONTENT).get("contentPartner").get("id").asText();
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-        String externalId = jsonNode.path("content").get("externalId").asText();
-        boolean isActive = jsonNode.path("content").get("isActive").asBoolean(false);
+        String externalId = jsonNode.path(Constants.CONTENT).get("externalId").asText();
+        boolean isActive = jsonNode.path(Constants.CONTENT).get("isActive").asBoolean(false);
         return saveOrUpdateContent(externalId,jsonNode,currentTime,isActive,partnerCode,partnerId);
     }
 
@@ -303,23 +315,17 @@ public class CiosContentServiceImpl implements CiosContentService {
         Optional<CornellContentEntity> optExternalContent = repository.findByExternalIdAndPartnerId(externalId,partnerId);
         if (optExternalContent.isPresent()) {
             externalContent = optExternalContent.get();
-            externalContent.setExternalId(externalId);
-            externalContent.setCiosData(transformData);
-            externalContent.setIsActive(isActive);
             externalContent.setCreatedDate(externalContent.getCreatedDate());
-            externalContent.setUpdatedDate(currentTime);
-            externalContent.setPartnerCode(partnerCode);
-            externalContent.setPartnerId(partnerId);
         } else {
             externalContent = new CornellContentEntity();
-            externalContent.setExternalId(externalId);
-            externalContent.setCiosData(transformData);
-            externalContent.setIsActive(isActive);
             externalContent.setCreatedDate(currentTime);
-            externalContent.setUpdatedDate(currentTime);
-            externalContent.setPartnerCode(partnerCode);
-            externalContent.setPartnerId(partnerId);
         }
+        externalContent.setExternalId(externalId);
+        externalContent.setCiosData(transformData);
+        externalContent.setIsActive(isActive);
+        externalContent.setUpdatedDate(currentTime);
+        externalContent.setPartnerCode(partnerCode);
+        externalContent.setPartnerId(partnerId);
         repository.save(externalContent);
         Map<String, Object> entityMap = objectMapper.convertValue(externalContent, Map.class);
         dataTransformUtility.flattenContentData(entityMap);
@@ -332,12 +338,11 @@ public class CiosContentServiceImpl implements CiosContentService {
         return externalContent;
     }
 
-    private JsonNode addSearchTags(JsonNode transformData) {
+    private void addSearchTags(JsonNode transformData) {
         List<String> searchTags = new ArrayList<>();
         searchTags.add(transformData.path(Constants.CONTENT).get(Constants.NAME).textValue().toLowerCase());
         ArrayNode searchTagsArray = objectMapper.valueToTree(searchTags);
-        ((ObjectNode) transformData.path(Constants.CONTENT)).put(Constants.CONTENT_SEARCH_TAGS, searchTagsArray);
-        return transformData;
+        ((ObjectNode) transformData.path(Constants.CONTENT)).set(Constants.CONTENT_SEARCH_TAGS, searchTagsArray);
     }
     private boolean isValidFileFormat(String fileName) {
         if (fileName == null) {
