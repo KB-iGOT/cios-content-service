@@ -73,5 +73,11 @@
   },
   "accessSettingsEnabled": {
     "type": "boolean"
+  },
+  "summary": {
+    "type": "text"
+  },
+  "knowledgeLevel": {
+    "type": "text"
   }
 }
