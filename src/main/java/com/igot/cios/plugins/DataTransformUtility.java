@@ -40,6 +40,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.*;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static javax.xml.bind.DatatypeConverter.parseDate;
@@ -628,5 +631,13 @@ public class DataTransformUtility {
             escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return escapedValue;
+    }
+
+    public String updateDateFormatFromTimestampForCoursera(Long timestampMillis) {
+        Instant instant = Instant.ofEpochMilli(timestampMillis);
+        DateTimeFormatter formatter = DateTimeFormatter
+                .ofPattern(Constants.DATE_FORMAT)
+                .withZone(ZoneId.of(Constants.UTC));
+        return formatter.format(instant);
     }
 }

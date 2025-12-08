@@ -27,6 +27,9 @@ public class CourseScheduler {
     @Value("${coursera.scheduler.enabled}")
     private boolean courseraSchedulerEnabled;
 
+    @Value("${cdac.scheduler.enabled}")
+    private boolean cdacSchedulerEnabled;
+
     @Scheduled(cron = "${scheduler.cron}")
     private void callCornellEnrollmentApi() throws JsonProcessingException{
         if (schedulerEnabled) {
@@ -45,7 +48,7 @@ public class CourseScheduler {
 
     @Scheduled(cron = "${cdac.scheduler.cron}")
     private void callCdacEnrollmentApi() throws JsonProcessingException {
-        if (courseraSchedulerEnabled) {
+        if (cdacSchedulerEnabled) {
             log.info("CourseScheduler :: callCourseraEnrollmentApi");
             cdacSchedulerService.loadCdacEnrollment();
         }

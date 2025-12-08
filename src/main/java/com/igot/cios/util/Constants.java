@@ -117,6 +117,8 @@ public class Constants {
     public static final String CONTENTID = "contentId";
     public static final String FROM_DATE = "fromdate";
     public static final String TO_DATE = "todate";
+    public static final String UTC = "UTC";
+    public static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 
 
     private Constants() {
