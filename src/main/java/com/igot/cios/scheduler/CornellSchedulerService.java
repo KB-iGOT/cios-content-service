@@ -60,17 +60,20 @@ public class CornellSchedulerService{
             log.info("courseId  and userid {} {}", courseId, userId);
             Map<String, Object> propertyMap = new HashMap<>();
             propertyMap.put("userid", userId);
-            propertyMap.put("courseid", courseId);
-            propertyMap.put("progress", 100);
+            propertyMap.put(Constants.COURSEID, courseId);
             List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
-            if (CollectionUtils.isEmpty(listOfMasterData)) {
-                Long date = Long.valueOf(transformData.get("completedon").asText());
+            if (!CollectionUtils.isEmpty(listOfMasterData)) {
+                if (!listOfMasterData.get(0).get(Constants.PROGRESS).equals(100)) {
+                Long date = Long.valueOf(transformData.get(Constants.COMPLETED_ON).asText());
                 String formatedDate = updateDateFormatFromTimestamp(date);
-                ((ObjectNode) transformData).put("completedon", formatedDate);
-                ((ObjectNode) transformData).put("partnerCode", partnerCode);
-                ((ObjectNode) transformData).put("partnerId", partnerId);
+                ((ObjectNode) transformData).put(Constants.COMPLETED_ON, formatedDate);
+                ((ObjectNode) transformData).put(Constants.PARTNER_CODE, partnerCode);
+                ((ObjectNode) transformData).put(Constants.PARTNER_ID, partnerId);
                 payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
                 kafkaProducer.push(cbServerProperties.getTopic(), transformData);
+                } else {
+                    log.info("course already completed for user {} courseid {}", userId, courseId);
+                }
             } else {
                 log.info("Progress updated 100 for user {}", userId);
             }

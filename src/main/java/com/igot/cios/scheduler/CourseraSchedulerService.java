@@ -1,7 +1,6 @@
 package com.igot.cios.scheduler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -26,6 +25,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
@@ -82,7 +83,7 @@ public class CourseraSchedulerService {
         LocalDateTime currentDateTime = LocalDateTime.now();
         LocalDateTime previousDate = currentDateTime.minusDays(cbServerProperties.getCourseraDateRange());
         ZonedDateTime zonedDateTime = previousDate.atZone(ZoneId.of("UTC"));
-        long timestamp = zonedDateTime.toInstant().getEpochSecond();
+        long timestamp = zonedDateTime.toInstant().toEpochMilli();
         long currentMillis = System.currentTimeMillis();
         long timestampWithoutMillis = (currentMillis / 1000) * 1000;
         Map<String, String> urlMap = new HashMap<>();
@@ -133,19 +134,22 @@ public class CourseraSchedulerService {
                 log.info("courseId  and userid {} {}", courseId, userId);
                 Map<String, Object> propertyMap = new HashMap<>();
                 propertyMap.put(Constants.USER_ID, userId);
-                propertyMap.put("courseid", courseId);
-                propertyMap.put("progress", 100);
+                propertyMap.put(Constants.COURSEID, courseId);
                 List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
-                if (CollectionUtils.isEmpty(listOfMasterData)) {
-                    Long date = Long.valueOf(transformData.get("completedon").asText());
-                    String formatedDate = updateDateFormatFromTimestamp(date);
-                    ((ObjectNode) transformData).put("completedon", formatedDate);
-                    ((ObjectNode) transformData).put("partnerCode", partnerCode);
-                    ((ObjectNode) transformData).put("partnerId", partnerId);
-                    payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
-                    kafkaProducer.push(cbServerProperties.getTopic(), transformData);
+                if (!CollectionUtils.isEmpty(listOfMasterData)) {
+                    if (!listOfMasterData.get(0).get(Constants.PROGRESS).equals(100)) {
+                        Long date = Long.valueOf(transformData.get(Constants.COMPLETED_ON).asText());
+                        String formatedDate = updateDateFormatFromTimestamp(date);
+                        ((ObjectNode) transformData).put(Constants.COMPLETED_ON, formatedDate);
+                        ((ObjectNode) transformData).put(Constants.PARTNER_CODE, partnerCode);
+                        ((ObjectNode) transformData).put(Constants.PARTNER_ID, partnerId);
+                        payloadValidation.validatePayload(Constants.PROGRESS_DATA_VALIDATION_FILE, transformData);
+                        kafkaProducer.push(cbServerProperties.getTopic(), transformData);
+                    } else {
+                        log.info("course already completed for user {} courseid {}", userId, courseId);
+                    }
                 } else {
-                    log.info("Progress updated 100 for user {}", userId);
+                    log.info("enrolment record not found for user {} courseid {}", userId,courseId);
                 }
             }
         } catch (Exception e) {
@@ -154,9 +158,12 @@ public class CourseraSchedulerService {
         }
     }
 
-    private String updateDateFormatFromTimestamp(Long completedon) {
-        Date date = new Date(completedon);
-        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
-        return sdf.format(date);
+    private String updateDateFormatFromTimestamp(Long timestampMillis) {
+        Instant instant = Instant.ofEpochMilli(timestampMillis);
+        DateTimeFormatter formatter = DateTimeFormatter
+                .ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+                .withZone(ZoneId.of("UTC"));
+
+        return formatter.format(instant);
     }
 }
