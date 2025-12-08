@@ -14,10 +14,10 @@ import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
 import com.igot.cios.util.transactional.cassandrautils.CassandraOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.text.SimpleDateFormat;
@@ -136,10 +136,12 @@ public class CourseraSchedulerService {
                 propertyMap.put(Constants.USER_ID, userId);
                 propertyMap.put(Constants.COURSEID, courseId);
                 List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
-                if (!CollectionUtils.isEmpty(listOfMasterData)) {
+                if (CollectionUtils.isNotEmpty(listOfMasterData) &&
+                        listOfMasterData.get(0) != null &&
+                        listOfMasterData.get(0).get(Constants.PROGRESS) != null) {
                     if (!listOfMasterData.get(0).get(Constants.PROGRESS).equals(100)) {
                         Long date = Long.valueOf(transformData.get(Constants.COMPLETED_ON).asText());
-                        String formatedDate = updateDateFormatFromTimestamp(date);
+                        String formatedDate = dataTransformUtility.updateDateFormatFromTimestampForCoursera(date);
                         ((ObjectNode) transformData).put(Constants.COMPLETED_ON, formatedDate);
                         ((ObjectNode) transformData).put(Constants.PARTNER_CODE, partnerCode);
                         ((ObjectNode) transformData).put(Constants.PARTNER_ID, partnerId);
@@ -158,12 +160,4 @@ public class CourseraSchedulerService {
         }
     }
 
-    private String updateDateFormatFromTimestamp(Long timestampMillis) {
-        Instant instant = Instant.ofEpochMilli(timestampMillis);
-        DateTimeFormatter formatter = DateTimeFormatter
-                .ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-                .withZone(ZoneId.of("UTC"));
-
-        return formatter.format(instant);
-    }
 }
