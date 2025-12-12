@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ssoProtocol": {
+      "type": "string",
+      "enum": ["saml", "openid-connect"]
+    },
+    "partnerName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clientId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ssoId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ssoUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "acsUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "ACS URL"
+    },
+    "emailAttribute": {
+      "type": "string",
+      "minLength": 1
+    },
+    "firstNameAttribute": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lastNameAttribute": {
+      "type": "string",
+      "minLength": 1
+    },
+    "userIdAttribute": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "boolean"
+    },
+    "ssoTested": {
+      "type": "boolean"
+    },
+    "ssoTestUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "configuration": {
+      "type": "string",
+      "enum": ["completed", "incomplete"]
+    }
+  },
+  "required": [
+    "ssoId",
+    "ssoProtocol",
+    "partnerName",
+    "clientId",
+    "ssoUrl",
+    "acsUrl",
+    "emailAttribute",
+    "firstNameAttribute",
+    "lastNameAttribute",
+    "userIdAttribute",
+    "status",
+    "ssoTested",
+    "ssoTestUrl",
+    "configuration"
+  ],
+  "additionalProperties": false
+}
