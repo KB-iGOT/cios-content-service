@@ -121,6 +121,46 @@ public class Constants {
     public static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 
 
+    public static final String CLIENT_ID = "clientId";
+    public static final String SSO_ID = "ssoId";
+    public static final String SSO_CONFIGURATION_VALIDATION_FILE_JSON = "/PayloadValidation/SsoConfiguration.json";
+    public static final String CONFIGURATION = "configuration";
+    public static final String INCOMPLETE = "incomplete";
+    public static final String COMPLETE = "completed";
+    public static final String ENABLED = "enabled";
+    public static final String PROTOCOL = "protocol";
+    public static final String SSO_PROTOCOL = "ssoProtocol";
+    public static final String SAML_ASSERTION_CONSUMER_URL_POST = "saml_assertion_consumer_url_post";
+    public static final String SAML_ASSERTION_CONSUMER_URL_REDIRECT = "saml_assertion_consumer_url_redirect";
+    public static final String SAML_SINGLE_LOGOUT_SERVICE_POST_URL = "saml_single_logout_service_url_post";
+    public static final String SAML_SINGLE_LOGOUT_SERVICE_REDIRECT_URL = "saml_single_logout_service_url_redirect";
+    public static final String ACS_URL = "acsUrl";
+    public static final String SSO_URL = "ssoUrl";
+    public static final String PARTNER_NAME = "partnerName";
+    public static final String SAML_ASSERTION_SIGNATURE = "saml.assertion.signature";
+    public static final String USER_ATTRIBUTE = "userIdAttribute";
+    public static final String EMAIL_ATTRIBUTE = "emailAttribute";
+    public static final String FIRSTNAME_ATTRIBUTE = "firstNameAttribute";
+    public static final String LASTNAME_ATTRIBUTE = "lastNameAttribute";
+    public static final String EMAIL = "email";
+    public static final String FIRSTNAME = "firstname";
+    public static final String LASTNAME = "lastname";
+    public static final String USERNAME = "username";
+    public static final String ANONYMOUS = "'anonymous'";
+    public static final String PROTOCOL_MAPPERS = "protocolMappers";
+    public static final String CONFIG = "config";
+    public static final String SCRIPT = "Script";
+    public static final String ATTRIBUTE_NAME = "attribute.name";
+    public static final String SINGLE = "single";
+    public static final String SAML = "saml";
+    public static final String CONSENT_REQUIRED = "consentRequired";
+    public static final String SAML_JAVASCRIPT_MAPPER = "saml-javascript-mapper";
+    public static final String ATTRIBUTES = "attributes";
+    public static final String SIGNATURE_ALGORITHM = "signature.algorithm";
+    public static final String SAML_CLIENT_SIGNATURE = "saml.client.signature";
+    public static final String SAML_ENCRYPT = "saml.encrypt";
+    public static final String SIGNATURE_ALGORITHM_RSA_SHA256 = "RSA_SHA256";
+    public static final String PROTOCOL_MAPPER = "protocolMapper";
     private Constants() {
     }
 

@@ -16,8 +16,6 @@ import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.repository.FileInfoRepository;
-import com.igot.cios.service.impl.CiosContentServiceImpl;
-import com.igot.cios.storage.StoreFileToGCP;
 import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.elasticsearch.service.EsUtilService;
@@ -30,20 +28,29 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.net.http.HttpRequest;
 
 import static javax.xml.bind.DatatypeConverter.parseDate;
 
@@ -640,4 +647,105 @@ public class DataTransformUtility {
                 .withZone(ZoneId.of(Constants.UTC));
         return formatter.format(instant);
     }
+
+    public String getAdminAccessToken() {
+        try {
+            String tokenUrl = cbServerProperties.keycloakUrl + "/realms/master/protocol/openid-connect/token";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("grant_type", "password");
+            form.add("client_id", "admin-cli");
+            form.add("username", cbServerProperties.ssoUsername);
+            form.add("password", cbServerProperties.ssoPassword);
+
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
+
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    tokenUrl,
+                    HttpMethod.POST,
+                    entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new CiosContentException(Constants.ERROR, "Failed to get token: ");
+            }
+
+            return (String) response.getBody().get("access_token");
+
+        } catch (Exception e) {
+            log.error("Error while fetching admin access token", e.getMessage());
+            throw new CiosContentException("Error while fetching admin access token", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String createSsoConfiguration(String token, Map<String,Object> client){
+        try {
+            String body = objectMapper.writeValueAsString(client);
+            String tokenUrl = cbServerProperties.keycloakUrl + "/admin/realms/" + URLEncoder.encode("sunbird", StandardCharsets.UTF_8) + "/clients";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<Void> response = restTemplate.exchange(
+                    tokenUrl,
+                    HttpMethod.POST,
+                    entity,
+                    Void.class
+            );
+            String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
+
+            if (location != null) {
+                return location.substring(location.lastIndexOf('/') + 1);
+            }
+
+        }catch (Exception e){
+            log.error("Error while creating sso configuration", e.getMessage());
+            throw new CiosContentException("Error while creating sso configuration in keycloak", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return  null;
+    }
+
+    public void updateSsoConfiguration(String token, String clientId, Map<String, Object> clientPayload) {
+        try {
+            clientPayload.put("id", clientId);
+            String body = objectMapper.writeValueAsString(clientPayload);
+            String url = cbServerProperties.keycloakUrl +
+                    "/admin/realms/" +
+                    URLEncoder.encode("sunbird", StandardCharsets.UTF_8) +
+                    "/clients/" +
+                    clientId;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+
+            restTemplate.exchange(
+                    url,
+                    HttpMethod.PUT,
+                    entity,
+                    Void.class
+            );
+            log.info("Successfully updated SSO configuration for client {}", clientId);
+
+        } catch (Exception e) {
+            log.error("Error updating SSO client {}", clientId, e);
+            throw new CiosContentException(
+                    "Error while updating SSO configuration in Keycloak",
+                    e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+
+
+//    fetchResultUsingGet()
+//
+//    fetchResultUsingPost()
 }
