@@ -77,7 +77,7 @@
   "summary": {
     "type": "text"
   },
-  "knowledgeLevel": {
+  "difficultyLevel": {
     "type": "text"
   }
 }
