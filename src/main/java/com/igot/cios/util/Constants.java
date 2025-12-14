@@ -161,6 +161,11 @@ public class Constants {
     public static final String SAML_ENCRYPT = "saml.encrypt";
     public static final String SIGNATURE_ALGORITHM_RSA_SHA256 = "RSA_SHA256";
     public static final String PROTOCOL_MAPPER = "protocolMapper";
+    public static final String SUNBIRD = "sinbird";
+    public static final String REALME = "/admin/realms/";
+    public static final String CLIENTS = "/clients/";
+    public static final String TRUE = "true";
+    public static final String FALSE = "false";
     private Constants() {
     }
 

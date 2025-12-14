@@ -160,15 +160,6 @@ public class DataTransformUtility {
         return dataRows;
     }
 
-    private boolean isDate(String value) {
-        try {
-            parseDate(value);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     public JsonNode transformData(Object sourceObject, List<Object> specJson) {
         log.debug("CiosContentServiceImpl::transformData");
         try {
@@ -405,7 +396,7 @@ public class DataTransformUtility {
         Optional<CornellContentEntity> optExternalContent = cornellContentRepository.findByExternalIdAndPartnerId(externalId,partnerId);
         if (optExternalContent.isPresent()) {
             CornellContentEntity externalContent = optExternalContent.get();
-            if(!(externalContent.getCiosData().get("content").get("status").equals("live")||externalContent.getCiosData().get("content").get("status").equals("draft"))){
+            if(!(externalContent.getCiosData().get(Constants.CONTENT).get("status").equals("live")||externalContent.getCiosData().get(Constants.CONTENT).get("status").equals("draft"))){
                 externalContent.setExternalId(externalId);
                 externalContent.setCiosData(transformData);
                 externalContent.setIsActive(externalContent.getIsActive());
@@ -461,10 +452,10 @@ public class DataTransformUtility {
     }
 
     public void flattenContentData(Map<String, Object> entityMap) {
-        if (entityMap.containsKey("ciosData") && entityMap.get("ciosData") instanceof Map) {
-            Map<String, Object> ciosDataMap = (Map<String, Object>) entityMap.get("ciosData");
-            if (ciosDataMap.containsKey("content") && ciosDataMap.get("content") instanceof Map) {
-                Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get("content");
+        if (entityMap.containsKey(Constants.CIOS_DATA) && entityMap.get(Constants.CIOS_DATA) instanceof Map) {
+            Map<String, Object> ciosDataMap = (Map<String, Object>) entityMap.get(Constants.CIOS_DATA);
+            if (ciosDataMap.containsKey(Constants.CONTENT) && ciosDataMap.get(Constants.CONTENT) instanceof Map) {
+                Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get(Constants.CONTENT);
                 entityMap.putAll(contentMap);
                 entityMap.remove(Constants.CIOS_DATA);
                 entityMap.remove(Constants.SOURCE_DATA);
@@ -535,7 +526,7 @@ public class DataTransformUtility {
                 transformErrorLog.put(Constants.FILE_ID, fileId);
                 transformErrorLog.put(Constants.FILE_NAME, fileName);
                 transformErrorLog.put(Constants.STATUS, Constants.FAILED);
-                transformErrorLog.put("error", loadContentErrorMessage);
+                transformErrorLog.put(Constants.ERROR_KEY, loadContentErrorMessage);
                 logStatus.getErrorLogs().add(transformErrorLog);
                 logStatus.setHasFailures(true);
                 String logFileName = fileName + "_" + partnerCode + Constants.LOG_TEXT;
@@ -685,7 +676,7 @@ public class DataTransformUtility {
     public String createSsoConfiguration(String token, Map<String,Object> client){
         try {
             String body = objectMapper.writeValueAsString(client);
-            String tokenUrl = cbServerProperties.keycloakUrl + "/admin/realms/" + URLEncoder.encode("sunbird", StandardCharsets.UTF_8) + "/clients";
+            String tokenUrl = cbServerProperties.keycloakUrl + Constants.REALME + URLEncoder.encode(Constants.SUNBIRD, StandardCharsets.UTF_8) + "/clients";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(token);
@@ -714,9 +705,9 @@ public class DataTransformUtility {
             clientPayload.put("id", clientId);
             String body = objectMapper.writeValueAsString(clientPayload);
             String url = cbServerProperties.keycloakUrl +
-                    "/admin/realms/" +
-                    URLEncoder.encode("sunbird", StandardCharsets.UTF_8) +
-                    "/clients/" +
+                    Constants.REALME +
+                    URLEncoder.encode(Constants.SUNBIRD, StandardCharsets.UTF_8) +
+                    Constants.CLIENTS +
                     clientId;
 
             HttpHeaders headers = new HttpHeaders();
@@ -743,9 +734,53 @@ public class DataTransformUtility {
         }
     }
 
+    public Map<String, String> getExistingMappers(String token, String clientUuid) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        ResponseEntity<JsonNode> response = restTemplate.exchange(
+                cbServerProperties.keycloakUrl + Constants.REALME + Constants.SUNBIRD +
+                        Constants.CLIENTS + clientUuid + "/protocol-mappers/models",
+                HttpMethod.GET,
+                entity,
+                JsonNode.class
+        );
+        Map<String, String> mapperNameToId = new HashMap<>();
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            for (JsonNode mapper : response.getBody()) {
+                mapperNameToId.put(
+                        mapper.path("name").asText(),
+                        mapper.path("id").asText()
+                );
+            }
+        }
+        return mapperNameToId;
+    }
 
-
-//    fetchResultUsingGet()
-//
-//    fetchResultUsingPost()
+    public void updateProtocolMapper(String token, String text, Map<String, Object> mapper) {
+        try {
+            String body = objectMapper.writeValueAsString(mapper);
+            String url = cbServerProperties.keycloakUrl +
+                    Constants.REALME +
+                    URLEncoder.encode(Constants.SUNBIRD, StandardCharsets.UTF_8) +
+                    Constants.CLIENTS +
+                    text +
+                    "/protocol-mappers/models/" +
+                    mapper.get("id");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+            restTemplate.exchange(
+                    url,
+                    HttpMethod.PUT,
+                    entity,
+                    Void.class
+            );
+            log.info("Successfully updated protocol mapper {}", mapper.get("name"));
+        } catch (Exception e) {
+            log.error("Error updating protocol mapper {}", mapper.get("name"), e);
+        }
+    }
 }
