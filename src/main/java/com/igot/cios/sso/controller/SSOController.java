@@ -34,10 +34,4 @@ public class SSOController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<String> delete(@PathVariable String id) {
-        String response = service.disableSsoConfiguration(id);
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
 }

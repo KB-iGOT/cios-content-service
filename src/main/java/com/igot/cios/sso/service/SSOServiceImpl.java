@@ -40,11 +40,6 @@ public class SSOServiceImpl implements SSOService{
     }
 
     @Override
-    public String disableSsoConfiguration(String id) {
-        return null;
-    }
-
-    @Override
     public SBApiResponse createSsoConfiguration(JsonNode ssoDetails,String partnerId) {
         SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
         if (ssoRepository.findById(partnerId).isPresent()) {
@@ -184,31 +179,33 @@ public class SSOServiceImpl implements SSOService{
         mappers.add(buildMapper(
                 Constants.LASTNAME,
                 ssoDetails.path(Constants.LASTNAME_ATTRIBUTE).asText(Constants.LASTNAME),
-                "userId = user.id; " +
-                        "parts = userId.split(':'); " +
-                        "lastPart = parts[parts.length - 1]; " +
-                        "lastPart;",
+                Constants.ANONYMOUS,
                 existingMapperIds
         ));
 
         mappers.add(buildMapper(
                 Constants.FIRSTNAME,
                 ssoDetails.path(Constants.FIRSTNAME_ATTRIBUTE).asText(Constants.FIRSTNAME),
-                "userId = user.id; \n" +
-                        "parts = userId.split(':'); \n" +
-                        "firstPart = parts[parts.length - 1]; \n" +
-                        "firstPart;",
+                """
+                        userId = user.id;
+                        parts = userId.split(':');
+                        firstPart = parts[parts.length - 1];
+                        firstPart;
+                        """,
                 existingMapperIds
         ));
 
         mappers.add(buildMapper(
                 Constants.EMAIL,
                 ssoDetails.path(Constants.EMAIL_ATTRIBUTE).asText(Constants.EMAIL),
-                "userId = user.id; \n" +
-                        "parts = userId.split(':'); \n" +
-                        "lastPart = parts[parts.length - 1]; \n" +
-                        "email = lastPart + '@karmayogi.com'; \n" +
-                        "email;",
+                """
+                        userId = user.id;
+                        parts = userId.split(':');
+                        lastPart = parts[parts.length - 1];
+                        email = lastPart + '@karmayogi.com';
+                        email;
+                        """
+                ,
                 existingMapperIds
         ));
         client.put(Constants.PROTOCOL_MAPPERS, mappers);
