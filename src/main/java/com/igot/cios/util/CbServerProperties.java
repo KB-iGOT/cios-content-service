@@ -106,4 +106,28 @@ public class CbServerProperties {
 
     @Value("${cdac.partner.code}")
     public String cdacPartnerCode;
+
+    @Value("${sso.url}")
+    public String keycloakUrl;
+
+    @Value("${sso.realm}")
+    public String ssoRealm;
+
+    @Value("${sso.username}")
+    public String ssoUsername;
+
+    @Value("${sso.password}")
+    public String ssoPassword;
+
+    @Value("${sso.admin.token.endpoint}")
+    public String ssoAdminTokenEndpoint;
+
+    @Value("${sso.config.create.api}")
+    public String ssoConfigCreateApi;
+
+    @Value("${sso.config.mapper.read.api}")
+    public String ssoConfigMapperReadApi;
+
+    @Value("${sso.config.mapper.update.api}")
+    public String ssoConfigMapperUpdateApi;
 }
