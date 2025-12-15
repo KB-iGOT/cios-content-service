@@ -211,7 +211,7 @@ public class CiosContentServiceImpl implements CiosContentService {
     @Override
     public ResponseEntity<?> deleteNotPublishContent(DeleteContentRequestDto deleteContentRequestDto) {
         log.info("Deleting non-published content");
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_DELETE_CIOS_CONTENT);
         String partnerCode=deleteContentRequestDto.getPartnerCode();
         List<String> externalIds = deleteContentRequestDto.getExternalId();
         List<CornellContentEntity> entities = repository.findByExternalIdInAndPartnerCode(externalIds,partnerCode);

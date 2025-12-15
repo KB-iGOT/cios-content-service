@@ -118,4 +118,16 @@ public class CbServerProperties {
 
     @Value("${sso.password}")
     public String ssoPassword;
+
+    @Value("${sso.admin.token.endpoint}")
+    public String ssoAdminTokenEndpoint;
+
+    @Value("${sso.config.create.api}")
+    public String ssoConfigCreateApi;
+
+    @Value("${sso.config.mapper.read.api}")
+    public String ssoConfigMapperReadApi;
+
+    @Value("${sso.config.mapper.update.api}")
+    public String ssoConfigMapperUpdateApi;
 }

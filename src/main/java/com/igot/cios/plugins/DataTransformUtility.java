@@ -23,6 +23,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -37,6 +38,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.*;
 import java.net.URI;
@@ -452,15 +454,23 @@ public class DataTransformUtility {
     }
 
     public void flattenContentData(Map<String, Object> entityMap) {
-        if (entityMap.containsKey(Constants.CIOS_DATA) && entityMap.get(Constants.CIOS_DATA) instanceof Map) {
-            Map<String, Object> ciosDataMap = (Map<String, Object>) entityMap.get(Constants.CIOS_DATA);
-            if (ciosDataMap.containsKey(Constants.CONTENT) && ciosDataMap.get(Constants.CONTENT) instanceof Map) {
-                Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get(Constants.CONTENT);
-                entityMap.putAll(contentMap);
-                entityMap.remove(Constants.CIOS_DATA);
-                entityMap.remove(Constants.SOURCE_DATA);
-            }
+        if (entityMap == null || entityMap.isEmpty()) {
+            return;
         }
+
+        Object ciosObj = entityMap.get(Constants.CIOS_DATA);
+        if (!(ciosObj instanceof Map<?, ?> ciosDataMap)) {
+            return;
+        }
+
+        Object contentObj = ciosDataMap.get(Constants.CONTENT);
+        if (!(contentObj instanceof Map<?, ?> contentMap)) {
+            return;
+        }
+
+        entityMap.putAll((Map<String, Object>) contentMap);
+        entityMap.remove(Constants.CIOS_DATA);
+        entityMap.remove(Constants.SOURCE_DATA);
     }
 
     public JsonNode callCiosReadApi(String extCourseId,String partnerId) {
@@ -641,16 +651,16 @@ public class DataTransformUtility {
 
     public String getAdminAccessToken() {
         try {
-            String tokenUrl = cbServerProperties.keycloakUrl + "/realms/master/protocol/openid-connect/token";
+            String tokenUrl = cbServerProperties.keycloakUrl + cbServerProperties.ssoAdminTokenEndpoint ;
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.add("grant_type", "password");
-            form.add("client_id", "admin-cli");
-            form.add("username", cbServerProperties.ssoUsername);
-            form.add("password", cbServerProperties.ssoPassword);
+            form.add(Constants.GRANT_TYPE, Constants.PASSWORD);
+            form.add(Constants.CLIENTID, Constants.ADMIN_CLI);
+            form.add(Constants.USERNAME, cbServerProperties.ssoUsername);
+            form.add(Constants.PASSWORD, cbServerProperties.ssoPassword);
 
             HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
 
@@ -665,7 +675,7 @@ public class DataTransformUtility {
                 throw new CiosContentException(Constants.ERROR, "Failed to get token: ");
             }
 
-            return (String) response.getBody().get("access_token");
+            return (String) response.getBody().get(Constants.ACCESS_TOKEN);
 
         } catch (Exception e) {
             log.error("Error while fetching admin access token", e.getMessage());
@@ -676,7 +686,7 @@ public class DataTransformUtility {
     public String createSsoConfiguration(String token, Map<String,Object> client){
         try {
             String body = objectMapper.writeValueAsString(client);
-            String tokenUrl = cbServerProperties.keycloakUrl + Constants.REALME + URLEncoder.encode(Constants.SUNBIRD, StandardCharsets.UTF_8) + "/clients";
+            String tokenUrl = cbServerProperties.keycloakUrl + cbServerProperties.ssoConfigCreateApi;
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(token);
@@ -704,11 +714,7 @@ public class DataTransformUtility {
         try {
             clientPayload.put("id", clientId);
             String body = objectMapper.writeValueAsString(clientPayload);
-            String url = cbServerProperties.keycloakUrl +
-                    Constants.REALME +
-                    URLEncoder.encode(Constants.SUNBIRD, StandardCharsets.UTF_8) +
-                    Constants.CLIENTS +
-                    clientId;
+            String url = cbServerProperties.keycloakUrl + cbServerProperties.ssoConfigCreateApi + "/" + clientId;
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -739,9 +745,13 @@ public class DataTransformUtility {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
+        String url = UriComponentsBuilder
+                .fromHttpUrl(cbServerProperties.keycloakUrl)
+                .path(cbServerProperties.getSsoConfigMapperReadApi())
+                .buildAndExpand(clientUuid)
+                .toUriString();
         ResponseEntity<JsonNode> response = restTemplate.exchange(
-                cbServerProperties.keycloakUrl + Constants.REALME + Constants.SUNBIRD +
-                        Constants.CLIENTS + clientUuid + "/protocol-mappers/models",
+                url,
                 HttpMethod.GET,
                 entity,
                 JsonNode.class
@@ -761,13 +771,11 @@ public class DataTransformUtility {
     public void updateProtocolMapper(String token, String text, Map<String, Object> mapper) {
         try {
             String body = objectMapper.writeValueAsString(mapper);
-            String url = cbServerProperties.keycloakUrl +
-                    Constants.REALME +
-                    URLEncoder.encode(Constants.SUNBIRD, StandardCharsets.UTF_8) +
-                    Constants.CLIENTS +
-                    text +
-                    "/protocol-mappers/models/" +
-                    mapper.get("id");
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(cbServerProperties.keycloakUrl)
+                    .path(cbServerProperties.getSsoConfigMapperUpdateApi())
+                    .buildAndExpand(text,mapper.get(Constants.ID))
+                    .toUriString();
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(token);

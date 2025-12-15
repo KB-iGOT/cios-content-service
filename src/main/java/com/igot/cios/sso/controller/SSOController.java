@@ -13,8 +13,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/sso")
 @Slf4j
 public class SSOController {
+    private final SSOService service;
+
     @Autowired
-    SSOService service;
+    public SSOController(SSOService service) {
+        this.service = service;
+    }
 
     @PostMapping("/create/{id}")
     public ResponseEntity<SBApiResponse> create(@RequestBody JsonNode ssoDetails, @PathVariable String id) {

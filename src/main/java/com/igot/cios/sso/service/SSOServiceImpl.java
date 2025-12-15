@@ -19,7 +19,7 @@ import java.sql.Timestamp;
 import java.util.*;
 
 @Service
-public class SSOServiceImpl implements SSOService{
+public class SSOServiceImpl implements SSOService {
 
     private final DataTransformUtility dataTransformUtility;
     private final SsoRepository ssoRepository;
@@ -40,8 +40,8 @@ public class SSOServiceImpl implements SSOService{
     }
 
     @Override
-    public SBApiResponse createSsoConfiguration(JsonNode ssoDetails,String partnerId) {
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+    public SBApiResponse createSsoConfiguration(JsonNode ssoDetails, String partnerId) {
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_SSO_CREATE);
         if (ssoRepository.findById(partnerId).isPresent()) {
             response.getParams().setErrmsg("SSO configuration already exists for partner: " + partnerId);
             response.getParams().setStatus(Constants.FAILED);
@@ -56,9 +56,9 @@ public class SSOServiceImpl implements SSOService{
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String token = dataTransformUtility.getAdminAccessToken();
 
-        Map<String,Object> client = constructSsoPayload(ssoDetails, new HashMap<>(), token);
+        Map<String, Object> client = constructSsoPayload(ssoDetails, new HashMap<>(), token);
         String id = dataTransformUtility.createSsoConfiguration(token, client);
-        if(StringUtils.isBlank(id)){
+        if (StringUtils.isBlank(id)) {
             response.getParams().setErrmsg("Failed to create SSO configuration in Keycloak");
             response.getParams().setStatus(Constants.FAILED);
             return response;
@@ -66,7 +66,7 @@ public class SSOServiceImpl implements SSOService{
         ((ObjectNode) ssoDetails).put(Constants.SSO_ID, id);
         ((ObjectNode) ssoDetails).put(Constants.STATUS, true);
         ((ObjectNode) ssoDetails).put(Constants.CONFIGURATION, Constants.INCOMPLETE);
-        SSOConfiguration configuration=new SSOConfiguration();
+        SSOConfiguration configuration = new SSOConfiguration();
         configuration.setPartnerId(partnerId);
         configuration.setSsoData(ssoDetails);
         configuration.setCreatedOn(currentTime);
@@ -74,7 +74,8 @@ public class SSOServiceImpl implements SSOService{
         SSOConfiguration savedResponse = ssoRepository.save(configuration);
         Map<String, Object> result = objectMapper.convertValue(
                 savedResponse,
-                new TypeReference<Map<String, Object>>() {}
+                new TypeReference<Map<String, Object>>() {
+                }
         );
         response.setResult(result);
         response.setResponseCode(HttpStatus.OK);
@@ -83,14 +84,14 @@ public class SSOServiceImpl implements SSOService{
 
     @Override
     public SBApiResponse updateSsoConfiguration(JsonNode ssoDetails, String partnerId) {
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_SSO_UPDATE);
         Optional<SSOConfiguration> existingOpt = ssoRepository.findById(partnerId);
         if (existingOpt.isEmpty()) {
             response.getParams().setErrmsg("SSO configuration not exists for partner: " + partnerId);
             response.getParams().setStatus(Constants.FAILED);
             return response;
         }
-        if(ssoDetails.get(Constants.CONFIGURATION).asText().equalsIgnoreCase(Constants.COMPLETE)){
+        if (ssoDetails.get(Constants.CONFIGURATION).asText().equalsIgnoreCase(Constants.COMPLETE)) {
             payloadValidation.validatePayload(Constants.SSO_CONFIGURATION_VALIDATION_FILE_JSON, ssoDetails);
         }
         String missing = validateMandatoryFields(ssoDetails, Constants.SSO_ID);
@@ -101,10 +102,10 @@ public class SSOServiceImpl implements SSOService{
         }
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String token = dataTransformUtility.getAdminAccessToken();
-        Map<String,String> existingMapperIds = dataTransformUtility.getExistingMappers(token, ssoDetails.get(Constants.SSO_ID).asText());
-        Map<String,Object> client = constructSsoPayload(ssoDetails, existingMapperIds, token);
+        Map<String, String> existingMapperIds = dataTransformUtility.getExistingMappers(token, ssoDetails.get(Constants.SSO_ID).asText());
+        Map<String, Object> client = constructSsoPayload(ssoDetails, existingMapperIds, token);
         dataTransformUtility.updateSsoConfiguration(token, ssoDetails.get(Constants.SSO_ID).asText(), client);
-        SSOConfiguration configuration=new SSOConfiguration();
+        SSOConfiguration configuration = new SSOConfiguration();
         configuration.setPartnerId(partnerId);
         configuration.setSsoData(ssoDetails);
         configuration.setCreatedOn(existingOpt.get().getCreatedOn());
@@ -112,7 +113,8 @@ public class SSOServiceImpl implements SSOService{
         SSOConfiguration savedResponse = ssoRepository.save(configuration);
         Map<String, Object> result = objectMapper.convertValue(
                 savedResponse,
-                new TypeReference<Map<String, Object>>() {}
+                new TypeReference<Map<String, Object>>() {
+                }
         );
         response.setResult(result);
         response.setResponseCode(HttpStatus.OK);
@@ -121,7 +123,7 @@ public class SSOServiceImpl implements SSOService{
 
     @Override
     public SBApiResponse readSsoConfiguration(String id) {
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_SSO_READ);
         SSOConfiguration configuration = ssoRepository.findById(id).orElse(null);
         if (configuration == null) {
             response.getParams().setErrmsg("SSO configuration not exists for partner: " + id);
@@ -130,7 +132,8 @@ public class SSOServiceImpl implements SSOService{
         }
         Map<String, Object> result = objectMapper.convertValue(
                 configuration,
-                new TypeReference<Map<String, Object>>() {}
+                new TypeReference<Map<String, Object>>() {
+                }
         );
         response.setResult(result);
         response.setResponseCode(HttpStatus.OK);
@@ -148,7 +151,7 @@ public class SSOServiceImpl implements SSOService{
     }
 
 
-    private Map<String,Object> constructSsoPayload(JsonNode ssoDetails, Map<String, String> existingMapperIds, String token) {
+    private Map<String, Object> constructSsoPayload(JsonNode ssoDetails, Map<String, String> existingMapperIds, String token) {
         Map<String, Object> client = new HashMap<>();
         client.put(Constants.CLIENT_ID, ssoDetails.get(Constants.CLIENT_ID));
         client.put(Constants.NAME, ssoDetails.get(Constants.PARTNER_NAME));
@@ -209,10 +212,10 @@ public class SSOServiceImpl implements SSOService{
                 existingMapperIds
         ));
         client.put(Constants.PROTOCOL_MAPPERS, mappers);
-        if(hasAnyMapperAttribute(ssoDetails)){
-            List<Map<String,Object>> existingMappers =
-                    (List<Map<String,Object>>) client.get(Constants.PROTOCOL_MAPPERS);
-            for (Map<String,Object> mapper : existingMappers) {
+        if (hasAnyMapperAttribute(ssoDetails)) {
+            List<Map<String, Object>> existingMappers =
+                    (List<Map<String, Object>>) client.get(Constants.PROTOCOL_MAPPERS);
+            for (Map<String, Object> mapper : existingMappers) {
                 if (mapper.containsKey("id")) {
                     dataTransformUtility.updateProtocolMapper(token, ssoDetails.get(Constants.SSO_ID).asText(), mapper);
                 }
