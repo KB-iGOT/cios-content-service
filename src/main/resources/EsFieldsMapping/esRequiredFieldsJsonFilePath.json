@@ -79,5 +79,8 @@
   },
   "difficultyLevel": {
     "type": "text"
+  },
+  "programId": {
+    "type": "keyword"
   }
 }
