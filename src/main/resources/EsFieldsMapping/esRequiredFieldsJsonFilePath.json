@@ -82,5 +82,8 @@
   },
   "programId": {
     "type": "keyword"
+  },
+  "sourceProvider": {
+    "type": "keyword"
   }
 }
