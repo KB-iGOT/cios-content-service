@@ -83,7 +83,7 @@
   "programId": {
     "type": "keyword"
   },
-  "sourceProvider": {
+  "courseProvider": {
     "type": "keyword"
   }
 }
