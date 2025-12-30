@@ -16,8 +16,6 @@ import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.repository.CornellContentRepository;
 import com.igot.cios.repository.FileInfoRepository;
-import com.igot.cios.service.impl.CiosContentServiceImpl;
-import com.igot.cios.storage.StoreFileToGCP;
 import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.elasticsearch.service.EsUtilService;
@@ -25,25 +23,36 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.net.http.HttpRequest;
 
 import static javax.xml.bind.DatatypeConverter.parseDate;
 
@@ -151,15 +160,6 @@ public class DataTransformUtility {
             throw new RuntimeException(e.getMessage());
         }
         return dataRows;
-    }
-
-    private boolean isDate(String value) {
-        try {
-            parseDate(value);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     public JsonNode transformData(Object sourceObject, List<Object> specJson) {
@@ -398,7 +398,7 @@ public class DataTransformUtility {
         Optional<CornellContentEntity> optExternalContent = cornellContentRepository.findByExternalIdAndPartnerId(externalId,partnerId);
         if (optExternalContent.isPresent()) {
             CornellContentEntity externalContent = optExternalContent.get();
-            if(!(externalContent.getCiosData().get("content").get("status").equals("live")||externalContent.getCiosData().get("content").get("status").equals("draft"))){
+            if(!(externalContent.getCiosData().get(Constants.CONTENT).get("status").equals("live")||externalContent.getCiosData().get(Constants.CONTENT).get("status").equals("draft"))){
                 externalContent.setExternalId(externalId);
                 externalContent.setCiosData(transformData);
                 externalContent.setIsActive(externalContent.getIsActive());
@@ -454,15 +454,23 @@ public class DataTransformUtility {
     }
 
     public void flattenContentData(Map<String, Object> entityMap) {
-        if (entityMap.containsKey("ciosData") && entityMap.get("ciosData") instanceof Map) {
-            Map<String, Object> ciosDataMap = (Map<String, Object>) entityMap.get("ciosData");
-            if (ciosDataMap.containsKey("content") && ciosDataMap.get("content") instanceof Map) {
-                Map<String, Object> contentMap = (Map<String, Object>) ciosDataMap.get("content");
-                entityMap.putAll(contentMap);
-                entityMap.remove(Constants.CIOS_DATA);
-                entityMap.remove(Constants.SOURCE_DATA);
-            }
+        if (entityMap == null || entityMap.isEmpty()) {
+            return;
         }
+
+        Object ciosObj = entityMap.get(Constants.CIOS_DATA);
+        if (!(ciosObj instanceof Map<?, ?> ciosDataMap)) {
+            return;
+        }
+
+        Object contentObj = ciosDataMap.get(Constants.CONTENT);
+        if (!(contentObj instanceof Map<?, ?> contentMap)) {
+            return;
+        }
+
+        entityMap.putAll((Map<String, Object>) contentMap);
+        entityMap.remove(Constants.CIOS_DATA);
+        entityMap.remove(Constants.SOURCE_DATA);
     }
 
     public JsonNode callCiosReadApi(String extCourseId,String partnerId) {
@@ -528,7 +536,7 @@ public class DataTransformUtility {
                 transformErrorLog.put(Constants.FILE_ID, fileId);
                 transformErrorLog.put(Constants.FILE_NAME, fileName);
                 transformErrorLog.put(Constants.STATUS, Constants.FAILED);
-                transformErrorLog.put("error", loadContentErrorMessage);
+                transformErrorLog.put(Constants.ERROR_KEY, loadContentErrorMessage);
                 logStatus.getErrorLogs().add(transformErrorLog);
                 logStatus.setHasFailures(true);
                 String logFileName = fileName + "_" + partnerCode + Constants.LOG_TEXT;
@@ -639,5 +647,148 @@ public class DataTransformUtility {
                 .ofPattern(Constants.DATE_FORMAT)
                 .withZone(ZoneId.of(Constants.UTC));
         return formatter.format(instant);
+    }
+
+    public String getAdminAccessToken() {
+        try {
+            String tokenUrl = cbServerProperties.keycloakUrl + cbServerProperties.ssoAdminTokenEndpoint ;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add(Constants.GRANT_TYPE, Constants.PASSWORD);
+            form.add(Constants.CLIENTID, Constants.ADMIN_CLI);
+            form.add(Constants.USERNAME, cbServerProperties.ssoUsername);
+            form.add(Constants.PASSWORD, cbServerProperties.ssoPassword);
+
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
+
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    tokenUrl,
+                    HttpMethod.POST,
+                    entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new CiosContentException(Constants.ERROR, "Failed to get token: ");
+            }
+
+            return (String) response.getBody().get(Constants.ACCESS_TOKEN);
+
+        } catch (Exception e) {
+            log.error("Error while fetching admin access token", e.getMessage());
+            throw new CiosContentException("Error while fetching admin access token", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String createSsoConfiguration(String token, Map<String,Object> client){
+        try {
+            String body = objectMapper.writeValueAsString(client);
+            String tokenUrl = cbServerProperties.keycloakUrl + cbServerProperties.ssoConfigCreateApi;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<Void> response = restTemplate.exchange(
+                    tokenUrl,
+                    HttpMethod.POST,
+                    entity,
+                    Void.class
+            );
+            String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
+
+            if (location != null) {
+                return location.substring(location.lastIndexOf('/') + 1);
+            }
+
+        }catch (Exception e){
+            log.error("Error while creating sso configuration", e.getMessage());
+            throw new CiosContentException("Error while creating sso configuration in keycloak", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return  null;
+    }
+
+    public void updateSsoConfiguration(String token, String clientId, Map<String, Object> clientPayload) {
+        try {
+            clientPayload.put("id", clientId);
+            String body = objectMapper.writeValueAsString(clientPayload);
+            String url = cbServerProperties.keycloakUrl + cbServerProperties.ssoConfigCreateApi + "/" + clientId;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+
+            restTemplate.exchange(
+                    url,
+                    HttpMethod.PUT,
+                    entity,
+                    Void.class
+            );
+            log.info("Successfully updated SSO configuration for client {}", clientId);
+
+        } catch (Exception e) {
+            log.error("Error updating SSO client {}", clientId, e);
+            throw new CiosContentException(
+                    "Error while updating SSO configuration in Keycloak",
+                    e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    public Map<String, String> getExistingMappers(String token, String clientUuid) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        String url = UriComponentsBuilder
+                .fromHttpUrl(cbServerProperties.keycloakUrl)
+                .path(cbServerProperties.getSsoConfigMapperReadApi())
+                .buildAndExpand(clientUuid)
+                .toUriString();
+        ResponseEntity<JsonNode> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                entity,
+                JsonNode.class
+        );
+        Map<String, String> mapperNameToId = new HashMap<>();
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            for (JsonNode mapper : response.getBody()) {
+                mapperNameToId.put(
+                        mapper.path("name").asText(),
+                        mapper.path("id").asText()
+                );
+            }
+        }
+        return mapperNameToId;
+    }
+
+    public void updateProtocolMapper(String token, String text, Map<String, Object> mapper) {
+        try {
+            String body = objectMapper.writeValueAsString(mapper);
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(cbServerProperties.keycloakUrl)
+                    .path(cbServerProperties.getSsoConfigMapperUpdateApi())
+                    .buildAndExpand(text,mapper.get(Constants.ID))
+                    .toUriString();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+            restTemplate.exchange(
+                    url,
+                    HttpMethod.PUT,
+                    entity,
+                    Void.class
+            );
+            log.info("Successfully updated protocol mapper {}", mapper.get("name"));
+        } catch (Exception e) {
+            log.error("Error updating protocol mapper {}", mapper.get("name"), e);
+        }
     }
 }

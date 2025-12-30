@@ -49,7 +49,7 @@ public class StoreFileToGCP {
 
     public SBApiResponse uploadCiosLogsFile(File file, String containerName, String cloudFolderName) {
         log.info("StoreFileToGCP :: uploadCiosLogsFile: uploading file to GCP {}", file);
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_UPLOAD_CIOS_LOGS);
         File tempFile = null;
         try {
             String uniqueFileName = System.currentTimeMillis() + "_" + file.getName();
@@ -79,7 +79,7 @@ public class StoreFileToGCP {
 
     public SBApiResponse uploadFile(File file, String cloudFolderName, String containerName) {
         log.info("StoreFileToGCP :: uploadFile: uploading file to GCP {}", file);
-        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_CB_PLAN_PUBLISH);
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_UPLOAD_FILE);
         try {
             String objectKey = cloudFolderName + "/" + file.getName();
             String url = storageService.upload(containerName, file.getAbsolutePath(), objectKey, Option.apply(false), Option.apply(1), Option.apply(5), Option.empty());
