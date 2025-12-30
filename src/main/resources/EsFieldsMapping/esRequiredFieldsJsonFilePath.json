@@ -77,7 +77,13 @@
   "summary": {
     "type": "text"
   },
-  "knowledgeLevel": {
+  "difficultyLevel": {
     "type": "text"
+  },
+  "programId": {
+    "type": "keyword"
+  },
+  "courseProvider": {
+    "type": "keyword"
   }
 }
