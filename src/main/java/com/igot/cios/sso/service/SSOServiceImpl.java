@@ -53,6 +53,7 @@ public class SSOServiceImpl implements SSOService {
             response.getParams().setStatus(Constants.FAILED);
             return response;
         }
+        payloadValidation.validatePayload(Constants.SSO_CONFIGURATION_VALIDATION_FILE_JSON, ssoDetails);
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String token = dataTransformUtility.getAdminAccessToken();
 
@@ -92,7 +93,7 @@ public class SSOServiceImpl implements SSOService {
             return response;
         }
         if (ssoDetails.get(Constants.CONFIGURATION).asText().equalsIgnoreCase(Constants.COMPLETE)) {
-            payloadValidation.validatePayload(Constants.SSO_CONFIGURATION_VALIDATION_FILE_JSON, ssoDetails);
+            payloadValidation.validatePayload(Constants.FINAL_SSO_CONFIGURATION_VALIDATION_FILE_JSON, ssoDetails);
         }
         String missing = validateMandatoryFields(ssoDetails, Constants.SSO_ID);
         if (StringUtils.isNoneBlank(missing)) {
@@ -100,6 +101,7 @@ public class SSOServiceImpl implements SSOService {
             response.getParams().setStatus(Constants.FAILED);
             return response;
         }
+        payloadValidation.validatePayload(Constants.SSO_CONFIGURATION_VALIDATION_FILE_JSON, ssoDetails);
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String token = dataTransformUtility.getAdminAccessToken();
         Map<String, String> existingMapperIds = dataTransformUtility.getExistingMappers(token, ssoDetails.get(Constants.SSO_ID).asText());

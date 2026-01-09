@@ -58,5 +58,21 @@
       "enum": ["completed", "incomplete"]
     }
   },
+  "required": [
+    "ssoId",
+    "ssoProtocol",
+    "partnerName",
+    "clientId",
+    "ssoUrl",
+    "acsUrl",
+    "emailAttribute",
+    "firstNameAttribute",
+    "lastNameAttribute",
+    "userIdAttribute",
+    "status",
+    "ssoTested",
+    "ssoTestUrl",
+    "configuration"
+  ],
   "additionalProperties": false
 }
