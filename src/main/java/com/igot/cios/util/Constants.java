@@ -122,6 +122,7 @@ public class Constants {
 
     public static final String CLIENT_ID = "clientId";
     public static final String SSO_ID = "ssoId";
+    public static final String FINAL_SSO_CONFIGURATION_VALIDATION_FILE_JSON = "/PayloadValidation/FinalSsoConfiguration.json";
     public static final String SSO_CONFIGURATION_VALIDATION_FILE_JSON = "/PayloadValidation/SsoConfiguration.json";
     public static final String CONFIGURATION = "configuration";
     public static final String INCOMPLETE = "incomplete";
