@@ -45,7 +45,7 @@
     "signatureAlgorithm": {
       "type": "string",
       "enum": [
-        "rsa-sha256"
+        "RSA_SHA256"
       ]
     },
     "samlSignatureKeyName": {
@@ -63,9 +63,6 @@
         "type": "boolean"
     },
     "forcePOSTBinding": {
-        "type": "boolean"
-    },
-    "frontChannelLogout": {
         "type": "boolean"
     },
     "forceNameIdFormat": {
@@ -132,15 +129,14 @@
     "signAssertions",
     "signatureAlgorithm",
     "samlSignatureKeyName",
-    "canonicalizationMethod",
     "encryptAssertions",
     "clientSignatureRequired",
     "forcePOSTBinding",
-    "frontChannelLogout",
     "forceNameIdFormat",
     "nameIdFormat",
     "rootUrl",
-    "validRedirectUrls"
+    "validRedirectUrls",
+    "mappers"
   ],
   "additionalProperties": false
 }
