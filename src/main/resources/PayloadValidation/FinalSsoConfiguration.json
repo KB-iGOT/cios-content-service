@@ -140,7 +140,8 @@
     "forceNameIdFormat",
     "nameIdFormat",
     "rootUrl",
-    "validRedirectUrls"
+    "validRedirectUrls",
+    "mappers"
   ],
   "additionalProperties": false
 }
