@@ -4,7 +4,10 @@
   "properties": {
     "ssoProtocol": {
       "type": "string",
-      "enum": ["saml", "openid-connect"]
+      "enum": [
+        "saml",
+        "openid-connect"
+      ]
     },
     "partnerName": {
       "type": "string",
@@ -27,21 +30,66 @@
       "format": "uri",
       "description": "ACS URL"
     },
-    "emailAttribute": {
-      "type": "string",
-      "minLength": 1
+    "includeAuthnStatement": {
+      "type": "boolean"
     },
-    "firstNameAttribute": {
-      "type": "string",
-      "minLength": 1
+    "signDocuments": {
+      "type": "boolean"
     },
-    "lastNameAttribute": {
-      "type": "string",
-      "minLength": 1
+    "optimizeRedirectSigningKeyLookup": {
+      "type": "boolean"
     },
-    "userIdAttribute": {
+    "signAssertions": {
+      "type": "boolean"
+    },
+    "signatureAlgorithm": {
       "type": "string",
-      "minLength": 1
+      "enum": [
+        "rsa-sha256"
+      ]
+    },
+    "samlSignatureKeyName": {
+      "type": "string",
+      "enum": [
+        "CERT_SUBJECT",
+        "KEY_ID",
+        "NONE"
+      ]
+    },
+    "encryptAssertions": {
+        "type": "boolean"
+    },
+    "clientSignatureRequired": {
+        "type": "boolean"
+    },
+    "forcePOSTBinding": {
+        "type": "boolean"
+    },
+    "frontChannelLogout": {
+        "type": "boolean"
+    },
+    "forceNameIdFormat": {
+      "type": "boolean"
+    },
+    "nameIdFormat": {
+      "type": "string",
+      "enum": [
+        "username",
+        "email",
+        "persistent",
+        "transient"
+      ]
+    },
+    "rootUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "validRedirectUrls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
     },
     "status": {
       "type": "boolean"
@@ -55,7 +103,16 @@
     },
     "configuration": {
       "type": "string",
-      "enum": ["completed", "incomplete"]
+      "enum": [
+        "completed",
+        "incomplete"
+      ]
+    },
+    "mappers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "required": [
@@ -65,14 +122,25 @@
     "clientId",
     "ssoUrl",
     "acsUrl",
-    "emailAttribute",
-    "firstNameAttribute",
-    "lastNameAttribute",
-    "userIdAttribute",
     "status",
     "ssoTested",
     "ssoTestUrl",
-    "configuration"
+    "configuration",
+    "includeAuthnStatement",
+    "signDocuments",
+    "optimizeRedirectSigningKeyLookup",
+    "signAssertions",
+    "signatureAlgorithm",
+    "samlSignatureKeyName",
+    "canonicalizationMethod",
+    "encryptAssertions",
+    "clientSignatureRequired",
+    "forcePOSTBinding",
+    "frontChannelLogout",
+    "forceNameIdFormat",
+    "nameIdFormat",
+    "rootUrl",
+    "validRedirectUrls"
   ],
   "additionalProperties": false
 }

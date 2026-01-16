@@ -563,9 +563,22 @@ public class DataTransformUtility {
                 List<String> validationErrors = validateRowData(dataPayloadValidationFile, transformedData);
                 if (validationErrors.isEmpty()) {
                     linkedRow.put(Constants.STATUS, Constants.SUCCESS);
-                    linkedRow.put("error", "");
+                    linkedRow.put(Constants.ERROR_KEY, "");
                     logStatus.getSuccessLogs().add(linkedRow);
                     addSearchTags(transformedData);
+                    if (contentNode.has(Constants.COURSE_PROVIDER)) {
+                        JsonNode courseProviderNode = contentNode.get(Constants.COURSE_PROVIDER);
+                        if (courseProviderNode != null && courseProviderNode.isTextual()) {
+                            try {
+                                String courseProviderStr = courseProviderNode.asText();
+                                JsonNode parsedCourseProvider = objectMapper.readTree(courseProviderStr);
+                                ((ObjectNode) contentNode).set(Constants.COURSE_PROVIDER, parsedCourseProvider);
+                                log.debug("Parsed courseProvider from JSON string to array for content");
+                            } catch (Exception e) {
+                                log.warn("Failed to parse courseProvider as JSON: {}", e.getMessage());
+                            }
+                        }
+                    }
                     String externalId = transformedData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
                     CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformedData, transformedData, currentTime, fileId, partnerId, partnerCode);
                     cornellContentEntityList.add(cornellContentEntity);
