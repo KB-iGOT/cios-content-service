@@ -84,6 +84,15 @@
         },
         "contentSearchTags": {
           "type": "keyword"
+        },
+        "courseProvider": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "difficultyLevel": {
+            "type": "string"
         }
       },
       "required": [

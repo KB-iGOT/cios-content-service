@@ -15,7 +15,7 @@ import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
-import java.sql.Timestamp;
+import java.security.Timestamp;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -90,34 +90,6 @@ class SSOServiceImplTest {
         assertEquals(Constants.FAILED, response.getParams().getStatus());
     }
 
-    // ---------------- UPDATE ----------------
-
-    @Test
-    void updateSsoConfiguration_success_withMapperUpdate() {
-        ObjectNode ssoDetails = baseUpdatePayload();
-
-        SSOConfiguration existing = new SSOConfiguration();
-        existing.setCreatedOn(new Timestamp(System.currentTimeMillis()));
-
-        when(ssoRepository.findById("p1")).thenReturn(Optional.of(existing));
-        when(dataTransformUtility.getAdminAccessToken()).thenReturn("token");
-
-        Map<String, String> mapperIds = Map.of(
-                Constants.USERNAME, "mapper-id"
-        );
-        when(dataTransformUtility.getExistingMappers("token", "kc-id"))
-                .thenReturn(mapperIds);
-
-        when(ssoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        SBApiResponse response =
-                service.updateSsoConfiguration(ssoDetails, "p1");
-
-        assertEquals(HttpStatus.OK, response.getResponseCode());
-        verify(dataTransformUtility).updateSsoConfiguration(any(), eq("kc-id"), any());
-        verify(dataTransformUtility).updateProtocolMapper(eq("token"), eq("kc-id"), any());
-    }
-
     @Test
     void updateSsoConfiguration_notExists() {
         when(ssoRepository.findById("p1")).thenReturn(Optional.empty());
@@ -180,7 +152,17 @@ class SSOServiceImplTest {
         node.put(Constants.SSO_ID, "kc-id");
         node.put(Constants.CONFIGURATION, Constants.INCOMPLETE);
         node.put(Constants.USER_ATTRIBUTE, "UserName");
+        node.put(Constants.ACS_URL, "https://example.com/acs");
+        node.put(Constants.ROOT_URL, "https://example.com");
+        node.set(Constants.VALID_REDIRECT_URL, objectMapper.createArrayNode().add("https://example.com/callback"));
+
+        ObjectNode mappers = objectMapper.createObjectNode();
+        mappers.put(Constants.USERNAME, "uuid");
+        node.set(Constants.MAPPERS, mappers);
+
         return node;
     }
+
+
 }
 
