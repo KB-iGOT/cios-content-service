@@ -223,8 +223,15 @@ public class SSOServiceImpl implements SSOService {
                         ssoDetails.get(Constants.SSO_ID).asText(),
                         mapper
                 );
+            } else {
+                dataTransformUtility.createProtocolMapper(
+                        token,
+                        ssoDetails.get(Constants.SSO_ID).asText(),
+                        mapper
+                );
             }
         }
+
         return client;
     }
 

@@ -566,19 +566,7 @@ public class DataTransformUtility {
                     linkedRow.put(Constants.ERROR_KEY, "");
                     logStatus.getSuccessLogs().add(linkedRow);
                     addSearchTags(transformedData);
-                    if (contentNode.has(Constants.COURSE_PROVIDER)) {
-                        JsonNode courseProviderNode = contentNode.get(Constants.COURSE_PROVIDER);
-                        if (courseProviderNode != null && courseProviderNode.isTextual()) {
-                            try {
-                                String courseProviderStr = courseProviderNode.asText();
-                                JsonNode parsedCourseProvider = objectMapper.readTree(courseProviderStr);
-                                ((ObjectNode) contentNode).set(Constants.COURSE_PROVIDER, parsedCourseProvider);
-                                log.debug("Parsed courseProvider from JSON string to array for content");
-                            } catch (Exception e) {
-                                log.warn("Failed to parse courseProvider as JSON: {}", e.getMessage());
-                            }
-                        }
-                    }
+                    parseCourseProviderIfNeeded(contentNode);
                     String externalId = transformedData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
                     CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformedData, transformedData, currentTime, fileId, partnerId, partnerCode);
                     cornellContentEntityList.add(cornellContentEntity);
@@ -608,6 +596,25 @@ public class DataTransformUtility {
             throw new RuntimeException(e);
         }
     }
+
+    private void parseCourseProviderIfNeeded(JsonNode contentNode) {
+        if (!contentNode.has(Constants.COURSE_PROVIDER)) {
+            return;
+        }
+        JsonNode courseProviderNode = contentNode.get(Constants.COURSE_PROVIDER);
+        if (courseProviderNode == null || !courseProviderNode.isTextual()) {
+            return;
+        }
+        try {
+            String courseProviderStr = courseProviderNode.asText();
+            JsonNode parsedCourseProvider = objectMapper.readTree(courseProviderStr);
+            ((ObjectNode) contentNode).set(Constants.COURSE_PROVIDER, parsedCourseProvider);
+            log.debug("Parsed courseProvider from JSON string to array for content");
+        } catch (Exception e) {
+            log.warn("Failed to parse courseProvider as JSON: {}", e.getMessage());
+        }
+    }
+
 
     public File writeLogsToFile(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
         log.info("Logs written to file: {}", originalFileName);
@@ -804,4 +811,32 @@ public class DataTransformUtility {
             log.error("Error updating protocol mapper {}", mapper.get("name"), e);
         }
     }
+
+    public void createProtocolMapper(String token, String clientId, Map<String, Object> mapper) {
+        try {
+            String body = objectMapper.writeValueAsString(mapper);
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(cbServerProperties.keycloakUrl)
+                    .path("/admin/realms/{realm}/clients/{clientId}/protocol-mappers/models")
+                    .buildAndExpand(cbServerProperties.getSsoRealm(), clientId)
+                    .toUriString();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+            restTemplate.postForEntity(url, entity, String.class);
+            log.info("Successfully created protocol mapper {}", mapper.get("name"));
+        } catch (Exception e) {
+            log.error("Error creating protocol mapper {}", mapper.get("name"), e);
+            throw new CiosContentException(
+                    "Error while creating protocol mapper in Keycloak",
+                    e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+
 }
