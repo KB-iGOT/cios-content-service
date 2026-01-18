@@ -566,7 +566,7 @@ public class DataTransformUtility {
                     linkedRow.put(Constants.ERROR_KEY, "");
                     logStatus.getSuccessLogs().add(linkedRow);
                     addSearchTags(transformedData);
-                    parseCourseProviderIfNeeded(contentNode);
+                    parseCourseProviderIfPresent(contentNode);
                     String externalId = transformedData.path(Constants.CONTENT).path(Constants.EXTERNAL_ID).asText();
                     CornellContentEntity cornellContentEntity = saveOrUpdateCornellContent(externalId, transformedData, transformedData, currentTime, fileId, partnerId, partnerCode);
                     cornellContentEntityList.add(cornellContentEntity);
@@ -597,7 +597,7 @@ public class DataTransformUtility {
         }
     }
 
-    private void parseCourseProviderIfNeeded(JsonNode contentNode) {
+    private void parseCourseProviderIfPresent(JsonNode contentNode) {
         if (!contentNode.has(Constants.COURSE_PROVIDER)) {
             return;
         }
