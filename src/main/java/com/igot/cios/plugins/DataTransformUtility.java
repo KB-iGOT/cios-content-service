@@ -827,9 +827,9 @@ public class DataTransformUtility {
 
             HttpEntity<String> entity = new HttpEntity<>(body, headers);
             restTemplate.postForEntity(url, entity, String.class);
-            log.info("Successfully created protocol mapper {}", mapper.get("name"));
+            log.info("Successfully created protocol mapper {}", mapper.get(Constants.NAME));
         } catch (Exception e) {
-            log.error("Error creating protocol mapper {}", mapper.get("name"), e);
+            log.error("Error creating protocol mapper {}", mapper.get(Constants.NAME), e);
             throw new CiosContentException(
                     "Error while creating protocol mapper in Keycloak",
                     e.getMessage(),
