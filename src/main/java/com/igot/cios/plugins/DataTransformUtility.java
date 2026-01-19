@@ -812,13 +812,13 @@ public class DataTransformUtility {
         }
     }
 
-    public void createProtocolMapper(String token, String clientId, Map<String, Object> mapper) {
+    public void createProtocolMapper(String token, String id, Map<String, Object> mapper) {
         try {
             String body = objectMapper.writeValueAsString(mapper);
             String url = UriComponentsBuilder
                     .fromHttpUrl(cbServerProperties.keycloakUrl)
-                    .path("/admin/realms/{realm}/clients/{clientId}/protocol-mappers/models")
-                    .buildAndExpand(cbServerProperties.getSsoRealm(), clientId)
+                    .path(cbServerProperties.getSsoConfigMapperReadApi())
+                    .buildAndExpand(id)
                     .toUriString();
 
             HttpHeaders headers = new HttpHeaders();
