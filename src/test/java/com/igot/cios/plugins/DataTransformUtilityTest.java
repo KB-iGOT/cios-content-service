@@ -186,5 +186,87 @@ class DataTransformUtilityTest {
         );
     }
 
+    @Test
+    void createProtocolMapper_success() {
+        cbServerProperties.keycloakUrl = "http://keycloak";
+
+        Map<String, Object> mapperPayload = new HashMap<>();
+        mapperPayload.put("name", "email-mapper");
+        mapperPayload.put("protocol", "saml");
+        mapperPayload.put("protocolMapper", "saml-user-property-mapper");
+
+        doReturn(new ResponseEntity<>("mapper-id", HttpStatus.CREATED))
+                .when(restTemplate)
+                .postForEntity(
+                        anyString(),
+                        any(HttpEntity.class),
+                        eq(String.class)
+                );
+
+        assertDoesNotThrow(() ->
+                dataTransformUtility.createProtocolMapper(
+                        "token",
+                        "client-id",
+                        mapperPayload
+                )
+        );
+        verify(restTemplate, times(1)).postForEntity(
+                anyString(),
+                any(HttpEntity.class),
+                eq(String.class)
+        );
+    }
+
+    @Test
+    void createProtocolMapper_failure_httpError() {
+        cbServerProperties.keycloakUrl = "http://keycloak";
+
+        Map<String, Object> mapperPayload = new HashMap<>();
+        mapperPayload.put("name", "email-mapper");
+
+        doThrow(new org.springframework.web.client.HttpClientErrorException(
+                HttpStatus.NOT_FOUND,
+                "404 Not Found: {\"error\":\"Could not find client\"}"
+        )).when(restTemplate)
+                .postForEntity(
+                        anyString(),
+                        any(HttpEntity.class),
+                        eq(String.class)
+                );
+
+        assertThrows(
+                CiosContentException.class,
+                () -> dataTransformUtility.createProtocolMapper(
+                        "token",
+                        "invalid-client-id",
+                        mapperPayload
+                )
+        );
+    }
+
+    @Test
+    void createProtocolMapper_failure_generalException() {
+        cbServerProperties.keycloakUrl = "http://keycloak";
+
+        Map<String, Object> mapperPayload = new HashMap<>();
+        mapperPayload.put("name", "email-mapper");
+
+        doThrow(new RuntimeException("Connection timeout"))
+                .when(restTemplate)
+                .postForEntity(
+                        anyString(),
+                        any(HttpEntity.class),
+                        eq(String.class)
+                );
+
+        assertThrows(
+                CiosContentException.class,
+                () -> dataTransformUtility.createProtocolMapper(
+                        "token",
+                        "client-id",
+                        mapperPayload
+                )
+        );
+    }
 
 }

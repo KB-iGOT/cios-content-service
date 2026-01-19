@@ -216,15 +216,24 @@ public class SSOServiceImpl implements SSOService {
 
         client.put(Constants.PROTOCOL_MAPPERS, mappers);
 
-        for (Map<String, Object> mapper : mappers) {
-            if (mapper.containsKey(Constants.ID)) {
-                dataTransformUtility.updateProtocolMapper(
-                        token,
-                        ssoDetails.get(Constants.SSO_ID).asText(),
-                        mapper
-                );
+        if(StringUtils.isNotBlank(ssoDetails.path(Constants.SSO_ID).asText())){
+            for (Map<String, Object> mapper : mappers) {
+                if (mapper.containsKey(Constants.ID)) {
+                    dataTransformUtility.updateProtocolMapper(
+                            token,
+                            ssoDetails.get(Constants.SSO_ID).asText(),
+                            mapper
+                    );
+                } else {
+                    dataTransformUtility.createProtocolMapper(
+                            token,
+                            ssoDetails.get(Constants.SSO_ID).asText(),
+                            mapper
+                    );
+                }
             }
         }
+
         return client;
     }
 
