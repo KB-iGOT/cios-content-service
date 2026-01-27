@@ -65,15 +65,12 @@ class CornellSchedulerServiceTest {
         realObjectMapper = new ObjectMapper();
     }
 
-    // Test updateDateFormatFromTimestamp
     @Test
     void testUpdateDateFormatFromTimestamp() throws Exception {
-        // Use reflection to test private method
         Method method = CornellSchedulerService.class.getDeclaredMethod(
                 "updateDateFormatFromTimestamp", Long.class);
         method.setAccessible(true);
 
-        // Test timestamp: 2024-01-27 12:30:45
         Long timestamp = 1706359845000L;
         String result = (String) method.invoke(cornellSchedulerService, timestamp);
 
@@ -90,10 +87,8 @@ class CornellSchedulerServiceTest {
         assertThrows(Exception.class, () -> method.invoke(cornellSchedulerService, (Long) null));
     }
 
-    // Test loadCornellEnrollment
     @Test
     void testLoadCornellEnrollment_success() throws JsonProcessingException {
-        // Setup mocks
         when(cbServerProperties.getCornellEnrollmentServiceCode()).thenReturn("CORNELL_SERVICE");
         when(cbServerProperties.getCornellEnrollmentListLimit()).thenReturn("100");
         when(cbServerProperties.getCornellEnrollmentListCourseType()).thenReturn("online");
@@ -105,7 +100,6 @@ class CornellSchedulerServiceTest {
         String payload = "{\"serviceCode\":\"CORNELL_SERVICE\"}";
         when(objectMapper.writeValueAsString(any())).thenReturn(payload);
 
-        // Mock response
         ObjectNode responseNode = realObjectMapper.createObjectNode();
         ArrayNode enrollmentsNode = realObjectMapper.createArrayNode();
         responseNode.set(Constants.ENROLLMENTS, enrollmentsNode);
@@ -117,10 +111,8 @@ class CornellSchedulerServiceTest {
         JsonNode partnerInfo = realObjectMapper.createObjectNode().put(Constants.ID, "partner-id-123");
         when(dataTransformUtility.fetchPartnerInfoUsingApi(anyString())).thenReturn(partnerInfo);
 
-        // Execute
         JsonNode result = cornellSchedulerService.loadCornellEnrollment();
 
-        // Verify
         assertNotNull(result);
         verify(objectMapper, times(1)).writeValueAsString(any());
         verify(restTemplate, times(1)).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class));
@@ -138,7 +130,6 @@ class CornellSchedulerServiceTest {
         assertThrows(RuntimeException.class, () -> cornellSchedulerService.loadCornellEnrollment());
     }
 
-    // Test formUrlMapForEnrollment
     @Test
     void testFormUrlMapForEnrollment() throws Exception {
         when(cbServerProperties.getCornellDateRange()).thenReturn(7);
@@ -158,7 +149,6 @@ class CornellSchedulerServiceTest {
         assertTrue(result.get("completion_range").matches("\\d{8}:\\d{8}"));
     }
 
-    // Test performEnrollmentCall
     @Test
     void testPerformEnrollmentCall_success() throws Exception {
         String partnerCode = "cornell";
@@ -167,7 +157,6 @@ class CornellSchedulerServiceTest {
         when(cbServerProperties.getServiceLocatorHost()).thenReturn("http://localhost");
         when(cbServerProperties.getServiceLocatorFixedUrl()).thenReturn("/api/v1/service");
 
-        // Create mock response with enrollments
         ObjectNode responseNode = realObjectMapper.createObjectNode();
         ArrayNode enrollmentsArray = realObjectMapper.createArrayNode();
         ObjectNode enrollment = realObjectMapper.createObjectNode();
@@ -187,7 +176,6 @@ class CornellSchedulerServiceTest {
         partnerInfo.set(Constants.TRANSFORM_PROGRESS_JSON, transformSpec);
         when(dataTransformUtility.fetchPartnerInfoUsingApi(anyString())).thenReturn(partnerInfo);
 
-        // Mock the transformation and other dependencies for callEnrollmentAPI
         List<Object> contentJson = new ArrayList<>();
         when(objectMapper.convertValue(any(JsonNode.class), any(TypeReference.class))).thenReturn(contentJson);
 
@@ -203,7 +191,6 @@ class CornellSchedulerServiceTest {
         ciosResponse.set("content", content);
         when(dataTransformUtility.callCiosReadApi(anyString(), anyString())).thenReturn(ciosResponse);
 
-        // Mock Cassandra - empty list so it doesn't proceed with Kafka
         when(cassandraOperation.getRecordsByProperties(anyString(), anyString(), any(), any()))
                 .thenReturn(new ArrayList<>());
 
@@ -235,7 +222,6 @@ class CornellSchedulerServiceTest {
         assertThrows(Exception.class, () -> method.invoke(cornellSchedulerService, partnerCode, requestBody));
     }
 
-    // Test callEnrollmentAPI
     @Test
     void testCallEnrollmentAPI_successfulFlow() throws Exception {
         String partnerCode = "cornell";
@@ -247,34 +233,28 @@ class CornellSchedulerServiceTest {
         contentData.put("completedon", "1706359845000");
         contentData.put("status", "completed");
 
-        // Mock cbServerProperties
         when(cbServerProperties.getTopic()).thenReturn("test-topic");
 
-        // Mock partner info
         ObjectNode partnerInfo = realObjectMapper.createObjectNode();
         ObjectNode transformSpec = realObjectMapper.createObjectNode();
         partnerInfo.set(Constants.TRANSFORM_PROGRESS_JSON, transformSpec);
         when(dataTransformUtility.fetchPartnerInfoUsingApi(partnerId)).thenReturn(partnerInfo);
 
-        // Mock objectMapper conversion
         List<Object> contentJson = new ArrayList<>();
         when(objectMapper.convertValue(any(JsonNode.class), any(TypeReference.class))).thenReturn(contentJson);
 
-        // Mock transform data
         ObjectNode transformedData = realObjectMapper.createObjectNode();
         transformedData.put("courseid", "ext-course-123");
         transformedData.put("userid", "user123@example.com");
         transformedData.put("completedon", "1706359845000");
         when(dataTransformUtility.transformData(any(), any())).thenReturn(transformedData);
 
-        // Mock CIOS read API
         ObjectNode ciosResponse = realObjectMapper.createObjectNode();
         ObjectNode content = realObjectMapper.createObjectNode();
         content.put("contentId", "internal-course-123");
         ciosResponse.set("content", content);
         when(dataTransformUtility.callCiosReadApi(anyString(), anyString())).thenReturn(ciosResponse);
 
-        // Mock Cassandra response - user enrolled but not completed
         List<Map<String, Object>> cassandraData = new ArrayList<>();
         Map<String, Object> enrollmentRecord = new HashMap<>();
         enrollmentRecord.put(Constants.PROGRESS, 50);
@@ -324,7 +304,6 @@ class CornellSchedulerServiceTest {
         ciosResponse.set("content", content);
         when(dataTransformUtility.callCiosReadApi(anyString(), anyString())).thenReturn(ciosResponse);
 
-        // Mock Cassandra response - course already completed (progress = 100)
         List<Map<String, Object>> cassandraData = new ArrayList<>();
         Map<String, Object> enrollmentRecord = new HashMap<>();
         enrollmentRecord.put(Constants.PROGRESS, 100);
@@ -338,7 +317,6 @@ class CornellSchedulerServiceTest {
 
         assertDoesNotThrow(() -> method.invoke(cornellSchedulerService, partnerCode, partnerId, contentData));
 
-        // Kafka should not be called when course is already completed
         verify(kafkaProducer, never()).push(anyString(), any());
     }
 
@@ -372,7 +350,6 @@ class CornellSchedulerServiceTest {
         ciosResponse.set("content", content);
         when(dataTransformUtility.callCiosReadApi(anyString(), anyString())).thenReturn(ciosResponse);
 
-        // Mock Cassandra response - empty list (user not enrolled)
         when(cassandraOperation.getRecordsByProperties(anyString(), anyString(), any(), any()))
                 .thenReturn(new ArrayList<>());
 
@@ -382,7 +359,6 @@ class CornellSchedulerServiceTest {
 
         assertDoesNotThrow(() -> method.invoke(cornellSchedulerService, partnerCode, partnerId, contentData));
 
-        // Kafka should not be called when user is not enrolled
         verify(kafkaProducer, never()).push(anyString(), any());
     }
 
