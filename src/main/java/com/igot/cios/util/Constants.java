@@ -205,6 +205,9 @@ public class Constants {
     public static final String REDIRECT_URIS = "redirectUris";
     public static final String DEFAULT_CLIENT_SCOPES = "defaultClientScopes";
     public static final String OPTIONAL_CLIENT_SCOPES = "optionalClientScopes";
+    public static final String TRANSFORM_PROGRESS_JSON = "transformProgressJson";
+    public static final String ENROLLMENTS = "enrollments";
+    public static final String CORNELL_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
     private Constants() {
     }
 

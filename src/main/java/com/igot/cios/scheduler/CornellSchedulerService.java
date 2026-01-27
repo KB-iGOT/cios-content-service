@@ -48,9 +48,16 @@ public class CornellSchedulerService{
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
+    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode eachContentData) {
         try {
             log.info("CornellSchedulerService::callEnrollmentAPI");
+            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerId);
+            JsonNode specNode = entity.path(Constants.TRANSFORM_PROGRESS_JSON);
+            List<Object> contentJson = objectMapper.convertValue(
+                    specNode,
+                    new TypeReference<List<Object>>() {}
+            );
+            JsonNode transformData = dataTransformUtility.transformData(eachContentData, contentJson);
             String extCourseId = transformData.get("courseid").asText();
             JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId,partnerId);
             String courseId = result.path("content").get("contentId").asText();
@@ -85,7 +92,7 @@ public class CornellSchedulerService{
 
     private String updateDateFormatFromTimestamp(Long completedon) {
         Date date = new Date(completedon);
-        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+        SimpleDateFormat sdf = new SimpleDateFormat(Constants.CORNELL_DATE_FORMAT);
         return sdf.format(date);
     }
 
@@ -130,10 +137,11 @@ public class CornellSchedulerService{
                 Object.class
         );
         if (response.getStatusCode().is2xxSuccessful()) {
-            JsonNode jsonData = objectMapper.valueToTree(response.getBody());
-            if(!jsonData.isMissingNode()){
+            JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
+            if(!jsonNode.isMissingNode()){
                 JsonNode contentPartnerResponse = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-                String partnerId = contentPartnerResponse.get("id").asText();
+                String partnerId = contentPartnerResponse.get(Constants.ID).asText();
+                JsonNode jsonData = jsonNode.path(Constants.ENROLLMENTS);
                 jsonData.forEach(
                         eachContentData -> {
                             callEnrollmentAPI(partnerCode, partnerId, eachContentData);
@@ -141,7 +149,7 @@ public class CornellSchedulerService{
             }else{
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);
             }
-            return jsonData;
+            return jsonNode;
         } else {
             throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
         }
