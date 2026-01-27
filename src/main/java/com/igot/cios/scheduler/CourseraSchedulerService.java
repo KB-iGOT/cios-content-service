@@ -62,6 +62,7 @@ public class CourseraSchedulerService {
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
+            //transformation will happen in service locator
             JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
             total = response.get("count").asInt();
             JsonNode enrollmentData = response.path("data");
