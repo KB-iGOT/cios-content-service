@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.RequestBodyDTO;
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.DataTransformUtility;
@@ -46,37 +47,42 @@ public class CourseraSchedulerService {
     @Autowired
     private DataTransformUtility dataTransformUtility;
 
-    public JsonNode loadCourseraEnrollment() {
+    public SBApiResponse loadCourseraEnrollment() {
         log.info("Coursera Scheduler Service::loadCourseraEnrollment()");
-        int start = 0;
-        int limit = cbServerProperties.getCourseraEnrollmentListLimit();
-        String payload = null;
-        ArrayNode allEnrollmentData = objectMapper.createArrayNode();
-        int total = 0;
-        while (start == 0 || start < total) {
-            RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
-            requestBodyDTO.setServiceCode(cbServerProperties.getCourseraEnrollmentServiceCode());
-            requestBodyDTO.setUrlMap(formUrlMapForEnrollment(start, limit));
-            try {
-                payload = objectMapper.writeValueAsString(requestBodyDTO);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
+        SBApiResponse apiResponse = SBApiResponse.createDefaultResponse("coursera.enrollment");
+        try {
+            int start = 0;
+            int limit = cbServerProperties.getCourseraEnrollmentListLimit();
+            ArrayNode allEnrollmentData = objectMapper.createArrayNode();
+            int total = 0;
+            while (start == 0 || start < total) {
+                RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
+                requestBodyDTO.setServiceCode(cbServerProperties.getCourseraEnrollmentServiceCode());
+                requestBodyDTO.setUrlMap(formUrlMapForEnrollment(start, limit));
+                String payload = objectMapper.writeValueAsString(requestBodyDTO);
+
+                JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
+                total = response.get("count").asInt();
+                JsonNode enrollmentData = response.path("data");
+                if (enrollmentData != null && !enrollmentData.isMissingNode() && enrollmentData.isArray()) {
+                    allEnrollmentData.addAll((ArrayNode) enrollmentData);
+                }
+                start += limit;
             }
-            //transformation will happen in service locator
-            JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
-            total = response.get("count").asInt();
-            JsonNode enrollmentData = response.path("data");
-            if (enrollmentData != null && !enrollmentData.isMissingNode() && enrollmentData.isArray()) {
-                allEnrollmentData.addAll((ArrayNode) enrollmentData);
-            }
-            start += limit;
+            allEnrollmentData.forEach(eachContentData -> {
+                JsonNode contentPartnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(cbServerProperties.courseraPartnerCode);
+                String partnerId = contentPartnerInfo.get("id").asText();
+                callEnrollmentAPI(cbServerProperties.courseraPartnerCode, partnerId, eachContentData);
+            });
+            apiResponse.setResponseCode(HttpStatus.OK);
+            return apiResponse;
+        } catch (Exception e) {
+            log.error("Error in loadCourseraEnrollment", e);
+            apiResponse.getParams().setErrmsg("Failed to load Coursera enrollment: " + e.getMessage());
+            apiResponse.getParams().setStatus(Constants.FAILED);
+            apiResponse.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return apiResponse;
         }
-        allEnrollmentData.forEach(eachContentData -> {
-            JsonNode contentPartnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(cbServerProperties.courseraPartnerCode);
-            String partnerId = contentPartnerInfo.get("id").asText();
-            callEnrollmentAPI(cbServerProperties.courseraPartnerCode, partnerId, eachContentData);
-        });
-        return allEnrollmentData;
     }
 
     private Map<String, String> formUrlMapForEnrollment(int start, int limit) {

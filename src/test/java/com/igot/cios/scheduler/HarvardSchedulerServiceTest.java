@@ -21,6 +21,7 @@ import java.util.Vector;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class HarvardSchedulerServiceTest {
@@ -44,6 +45,7 @@ class HarvardSchedulerServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(cbServerProperties.getHarvardAllowedFileExtensions()).thenReturn(".xlsx,.xls,.csv");
         harvardSchedulerService = new HarvardSchedulerService(cbServerProperties, ciosContentService);
     }
 
@@ -68,6 +70,58 @@ class HarvardSchedulerServiceTest {
         method.setAccessible(true);
 
         assertTrue((Boolean) method.invoke(harvardSchedulerService, fileName));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "test.txt",
+            "test.pdf",
+            "test.doc",
+            "test.xml",
+            "test",
+            "test.csvx",
+            "test.xlsm"
+    })
+    void testIsValidFile_invalidFiles(String fileName) throws Exception {
+        Method method = HarvardSchedulerService.class.getDeclaredMethod("isValidFile", String.class);
+        method.setAccessible(true);
+
+        assertFalse((Boolean) method.invoke(harvardSchedulerService, fileName));
+    }
+
+    @Test
+    void testIsValidFile_blankFileName() throws Exception {
+        Method method = HarvardSchedulerService.class.getDeclaredMethod("isValidFile", String.class);
+        method.setAccessible(true);
+
+        assertFalse((Boolean) method.invoke(harvardSchedulerService, ""));
+        assertFalse((Boolean) method.invoke(harvardSchedulerService, "   "));
+        assertFalse((Boolean) method.invoke(harvardSchedulerService, (String) null));
+    }
+
+    @Test
+    void testIsValidFile_configDriven() throws Exception {
+        when(cbServerProperties.getHarvardAllowedFileExtensions()).thenReturn(".pdf,.txt");
+
+        Method method = HarvardSchedulerService.class.getDeclaredMethod("isValidFile", String.class);
+        method.setAccessible(true);
+
+        assertTrue((Boolean) method.invoke(harvardSchedulerService, "test.pdf"));
+        assertTrue((Boolean) method.invoke(harvardSchedulerService, "test.txt"));
+        assertFalse((Boolean) method.invoke(harvardSchedulerService, "test.csv"));
+        assertFalse((Boolean) method.invoke(harvardSchedulerService, "test.xlsx"));
+    }
+
+    @Test
+    void testIsValidFile_withSpacesInConfig() throws Exception {
+        when(cbServerProperties.getHarvardAllowedFileExtensions()).thenReturn(".csv, .xlsx , .xls");
+
+        Method method = HarvardSchedulerService.class.getDeclaredMethod("isValidFile", String.class);
+        method.setAccessible(true);
+
+        assertTrue((Boolean) method.invoke(harvardSchedulerService, "test.csv"));
+        assertTrue((Boolean) method.invoke(harvardSchedulerService, "test.xlsx"));
+        assertTrue((Boolean) method.invoke(harvardSchedulerService, "test.xls"));
     }
 
     @Test

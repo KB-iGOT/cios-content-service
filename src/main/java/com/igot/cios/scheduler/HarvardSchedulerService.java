@@ -1,11 +1,14 @@
 package com.igot.cios.scheduler;
 
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.service.CiosContentService;
 import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.jcraft.jsch.*;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.stereotype.Service;
@@ -14,9 +17,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,10 +35,14 @@ public class HarvardSchedulerService {
         this.ciosContentService = ciosContentService;
     }
 
-    public void loadHarvardEnrollment() {
+    public SBApiResponse loadHarvardEnrollment() {
         log.info("HarvardSchedulerService :: loadHarvardEnrollment() - Starting Harvard file processing");
+        SBApiResponse apiResponse = SBApiResponse.createDefaultResponse("harvard.enrollment");
         Session session = null;
         ChannelSftp channelSftp = null;
+        int totalFiles = 0;
+        int processedFiles = 0;
+        int failedFiles = 0;
 
         try {
             session = createSftpSession();
@@ -41,26 +50,44 @@ public class HarvardSchedulerService {
 
             List<ChannelSftp.LsEntry> fileList = listFiles(channelSftp);
 
-            if (fileList == null || fileList.isEmpty()) {
+            if (CollectionUtils.isEmpty(fileList)) {
                 log.info("No files found in Harvard SFTP directory");
-                return;
+                apiResponse.put("message", "No files found in Harvard SFTP directory");
+                apiResponse.put("totalFiles", 0);
+                apiResponse.put("processedFiles", 0);
+                apiResponse.put("failedFiles", 0);
+                apiResponse.setResponseCode(HttpStatus.OK);
+                return apiResponse;
             }
 
             for (ChannelSftp.LsEntry entry : fileList) {
                 String fileName = entry.getFilename();
 
                 if (isValidFile(fileName)) {
+                    totalFiles++;
                     log.info("Processing file: {}", fileName);
-                    processFile(channelSftp, fileName);
+                    try {
+                        processFile(channelSftp, fileName);
+                        processedFiles++;
+                    } catch (Exception e) {
+                        failedFiles++;
+                        log.error("Failed to process file: {}", fileName, e);
+                    }
                 } else {
                     log.debug("Skipping non-supported file: {}", fileName);
                 }
             }
+            log.info("Harvard file processing completed. Total: {}, Processed: {}, Failed: {}", totalFiles, processedFiles, failedFiles);
+            apiResponse.put("message", "Harvard file processing completed");
+            apiResponse.setResponseCode(HttpStatus.OK);
+            return apiResponse;
 
         } catch (Exception e) {
             log.error("Error in loadHarvardEnrollment", e);
-            throw new CiosContentException(Constants.ERROR, "Failed to process Harvard SFTP files: " + e.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
+            apiResponse.getParams().setErrmsg("Failed to process Harvard SFTP files: " + e.getMessage());
+            apiResponse.getParams().setStatus(Constants.FAILED);
+            apiResponse.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return apiResponse;
         } finally {
             disconnectSftp(channelSftp, session);
         }
@@ -102,10 +129,18 @@ public class HarvardSchedulerService {
     }
 
     private boolean isValidFile(String fileName) {
+        if (StringUtils.isBlank(fileName)) {
+            return false;
+        }
+
         String lowerCaseFileName = fileName.toLowerCase();
-        return lowerCaseFileName.endsWith(".xlsx")
-                || lowerCaseFileName.endsWith(".xls")
-                || lowerCaseFileName.endsWith(".csv");
+        List<String> allowedExtensions = Arrays.stream(cbServerProperties.getHarvardAllowedFileExtensions().split(","))
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .toList();
+
+        return allowedExtensions.stream()
+                .anyMatch(lowerCaseFileName::endsWith);
     }
 
     private void processFile(ChannelSftp channelSftp, String fileName) {
@@ -117,6 +152,8 @@ public class HarvardSchedulerService {
                 moveFileToCompleted(channelSftp, fileName);
             } else {
                 log.error("File processing failed for: {}, file will not be moved", fileName);
+                throw new CiosContentException(Constants.ERROR, "File processing failed for: " + fileName,
+                        HttpStatus.INTERNAL_SERVER_ERROR);
             }
 
         } catch (Exception e) {
@@ -124,7 +161,7 @@ public class HarvardSchedulerService {
         }
     }
 
-    private byte[] downloadFile(ChannelSftp channelSftp, String remoteFilePath) throws SftpException {
+    private byte[] downloadFile(ChannelSftp channelSftp, String remoteFilePath) {
         log.info("Downloading file: {}", remoteFilePath);
 
         try (InputStream inputStream = channelSftp.get(remoteFilePath);

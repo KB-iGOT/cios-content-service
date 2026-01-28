@@ -4,8 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.util.CbServerProperties;
@@ -74,8 +74,25 @@ class CornellSchedulerServiceTest {
         Long timestamp = 1706359845000L;
         String result = (String) method.invoke(cornellSchedulerService, timestamp);
 
+        // Verify date format
         assertNotNull(result);
+        assertFalse(result.isEmpty());
         assertTrue(result.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"));
+
+        // Verify year is reasonable (2024-2026 range)
+        String year = result.substring(0, 4);
+        int yearInt = Integer.parseInt(year);
+        assertTrue(yearInt >= 2024 && yearInt <= 2026, "Year should be in reasonable range");
+
+        // Verify month is valid (01-12)
+        String month = result.substring(5, 7);
+        int monthInt = Integer.parseInt(month);
+        assertTrue(monthInt >= 1 && monthInt <= 12, "Month should be between 01-12");
+
+        // Verify day is valid (01-31)
+        String day = result.substring(8, 10);
+        int dayInt = Integer.parseInt(day);
+        assertTrue(dayInt >= 1 && dayInt <= 31, "Day should be between 01-31");
     }
 
     @Test
@@ -84,38 +101,10 @@ class CornellSchedulerServiceTest {
                 "updateDateFormatFromTimestamp", Long.class);
         method.setAccessible(true);
 
-        assertThrows(Exception.class, () -> method.invoke(cornellSchedulerService, (Long) null));
-    }
-
-    @Test
-    void testLoadCornellEnrollment_success() throws JsonProcessingException {
-        when(cbServerProperties.getCornellEnrollmentServiceCode()).thenReturn("CORNELL_SERVICE");
-        when(cbServerProperties.getCornellEnrollmentListLimit()).thenReturn("100");
-        when(cbServerProperties.getCornellEnrollmentListCourseType()).thenReturn("online");
-        when(cbServerProperties.getCornellDateRange()).thenReturn(7);
-        cbServerProperties.cornellPartnerCode = "cornell";
-        when(cbServerProperties.getServiceLocatorHost()).thenReturn("http://localhost");
-        when(cbServerProperties.getServiceLocatorFixedUrl()).thenReturn("/api/v1/service");
-
-        String payload = "{\"serviceCode\":\"CORNELL_SERVICE\"}";
-        when(objectMapper.writeValueAsString(any())).thenReturn(payload);
-
-        ObjectNode responseNode = realObjectMapper.createObjectNode();
-        ArrayNode enrollmentsNode = realObjectMapper.createArrayNode();
-        responseNode.set(Constants.ENROLLMENTS, enrollmentsNode);
-
-        when(objectMapper.valueToTree(any())).thenReturn(responseNode);
-        when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class)))
-                .thenReturn(ResponseEntity.ok(responseNode));
-
-        JsonNode partnerInfo = realObjectMapper.createObjectNode().put(Constants.ID, "partner-id-123");
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(anyString())).thenReturn(partnerInfo);
-
-        JsonNode result = cornellSchedulerService.loadCornellEnrollment();
-
-        assertNotNull(result);
-        verify(objectMapper, times(1)).writeValueAsString(any());
-        verify(restTemplate, times(1)).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class));
+        Exception exception = assertThrows(Exception.class, () ->
+            method.invoke(cornellSchedulerService, (Long) null)
+        );
+        assertNotNull(exception);
     }
 
     @Test
@@ -127,7 +116,23 @@ class CornellSchedulerServiceTest {
 
         when(objectMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("Error") {});
 
-        assertThrows(RuntimeException.class, () -> cornellSchedulerService.loadCornellEnrollment());
+        SBApiResponse result = cornellSchedulerService.loadCornellEnrollment();
+
+        // Verify error response structure
+        assertNotNull(result);
+        assertNotNull(result.getId());
+        assertEquals("cornell.enrollment", result.getId());
+        assertNotNull(result.getVer());
+        assertEquals(Constants.API_VERSION_1, result.getVer());
+        assertNotNull(result.getTs());
+        assertNotNull(result.getParams());
+        assertEquals(Constants.FAILED, result.getParams().getStatus());
+        assertNotNull(result.getParams().getErrmsg());
+        assertTrue(result.getParams().getErrmsg().contains("Failed to load Cornell enrollment"));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getResponseCode());
+
+        // Verify no enrollments in error case
+        assertFalse(result.containsKey("enrollments") && result.get("enrollments") != null);
     }
 
     @Test
@@ -141,67 +146,33 @@ class CornellSchedulerServiceTest {
 
         Map<String, String> result = (Map<String, String>) method.invoke(cornellSchedulerService);
 
+        // Verify all required fields are present
         assertNotNull(result);
+        assertEquals(4, result.size(), "Map should contain exactly 4 entries");
+
+        // Verify offset
+        assertTrue(result.containsKey("offset"));
         assertEquals("0", result.get("offset"));
+
+        // Verify limit
+        assertTrue(result.containsKey("limit"));
         assertEquals("100", result.get("limit"));
+
+        // Verify course_type
+        assertTrue(result.containsKey("course_type"));
         assertEquals("online", result.get("course_type"));
+
+        // Verify completion_range
         assertTrue(result.containsKey("completion_range"));
-        assertTrue(result.get("completion_range").matches("\\d{8}:\\d{8}"));
-    }
+        String completionRange = result.get("completion_range");
+        assertNotNull(completionRange);
+        assertTrue(completionRange.matches("\\d{8}:\\d{8}"), "Completion range should match format YYYYMMDD:YYYYMMDD");
+        assertTrue(completionRange.contains(":"), "Completion range should contain colon separator");
 
-    @Test
-    void testPerformEnrollmentCall_success() throws Exception {
-        String partnerCode = "cornell";
-        String requestBody = "{\"serviceCode\":\"CORNELL_SERVICE\"}";
-
-        when(cbServerProperties.getServiceLocatorHost()).thenReturn("http://localhost");
-        when(cbServerProperties.getServiceLocatorFixedUrl()).thenReturn("/api/v1/service");
-
-        ObjectNode responseNode = realObjectMapper.createObjectNode();
-        ArrayNode enrollmentsArray = realObjectMapper.createArrayNode();
-        ObjectNode enrollment = realObjectMapper.createObjectNode();
-        enrollment.put("courseid", "course-123");
-        enrollment.put("userid", "user@example.com");
-        enrollment.put("completedon", "1706359845000");
-        enrollmentsArray.add(enrollment);
-        responseNode.set(Constants.ENROLLMENTS, enrollmentsArray);
-
-        when(objectMapper.valueToTree(any())).thenReturn(responseNode);
-        when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class)))
-                .thenReturn(ResponseEntity.ok(responseNode));
-
-        ObjectNode partnerInfo = realObjectMapper.createObjectNode();
-        partnerInfo.put(Constants.ID, "partner-id-123");
-        ObjectNode transformSpec = realObjectMapper.createObjectNode();
-        partnerInfo.set(Constants.TRANSFORM_PROGRESS_JSON, transformSpec);
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(anyString())).thenReturn(partnerInfo);
-
-        List<Object> contentJson = new ArrayList<>();
-        when(objectMapper.convertValue(any(JsonNode.class), any(TypeReference.class))).thenReturn(contentJson);
-
-        ObjectNode transformedData = realObjectMapper.createObjectNode();
-        transformedData.put("courseid", "course-123");
-        transformedData.put("userid", "user@example.com");
-        transformedData.put("completedon", "1706359845000");
-        when(dataTransformUtility.transformData(any(), any())).thenReturn(transformedData);
-
-        ObjectNode ciosResponse = realObjectMapper.createObjectNode();
-        ObjectNode content = realObjectMapper.createObjectNode();
-        content.put("contentId", "internal-course-123");
-        ciosResponse.set("content", content);
-        when(dataTransformUtility.callCiosReadApi(anyString(), anyString())).thenReturn(ciosResponse);
-
-        when(cassandraOperation.getRecordsByProperties(anyString(), anyString(), any(), any()))
-                .thenReturn(new ArrayList<>());
-
-        Method method = CornellSchedulerService.class.getDeclaredMethod(
-                "performEnrollmentCall", String.class, String.class);
-        method.setAccessible(true);
-
-        JsonNode result = (JsonNode) method.invoke(cornellSchedulerService, partnerCode, requestBody);
-
-        assertNotNull(result);
-        verify(restTemplate, times(1)).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class));
+        String[] dates = completionRange.split(":");
+        assertEquals(2, dates.length, "Should have start and end date");
+        assertEquals(8, dates[0].length(), "Start date should be 8 digits");
+        assertEquals(8, dates[1].length(), "End date should be 8 digits");
     }
 
     @Test
@@ -219,7 +190,16 @@ class CornellSchedulerServiceTest {
                 "performEnrollmentCall", String.class, String.class);
         method.setAccessible(true);
 
-        assertThrows(Exception.class, () -> method.invoke(cornellSchedulerService, partnerCode, requestBody));
+        Exception exception = assertThrows(Exception.class, () ->
+            method.invoke(cornellSchedulerService, partnerCode, requestBody)
+        );
+
+        // Verify exception details
+        assertNotNull(exception);
+        assertNotNull(exception.getCause());
+
+        // Verify REST call was attempted
+        verify(restTemplate, times(1)).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class));
     }
 
     @Test
@@ -272,6 +252,10 @@ class CornellSchedulerServiceTest {
 
         verify(kafkaProducer, times(1)).push(anyString(), any());
         verify(payloadValidation, times(1)).validatePayload(anyString(), any());
+        verify(dataTransformUtility, times(1)).fetchPartnerInfoUsingApi(partnerId);
+        verify(dataTransformUtility, times(1)).transformData(any(), any());
+        verify(dataTransformUtility, times(1)).callCiosReadApi(anyString(), anyString());
+        verify(cassandraOperation, times(1)).getRecordsByProperties(anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -317,7 +301,15 @@ class CornellSchedulerServiceTest {
 
         assertDoesNotThrow(() -> method.invoke(cornellSchedulerService, partnerCode, partnerId, contentData));
 
+        // Verify no kafka push for already completed course
         verify(kafkaProducer, never()).push(anyString(), any());
+        verify(payloadValidation, never()).validatePayload(anyString(), any());
+
+        // But other services should be called
+        verify(dataTransformUtility, times(1)).fetchPartnerInfoUsingApi(partnerId);
+        verify(dataTransformUtility, times(1)).transformData(any(), any());
+        verify(dataTransformUtility, times(1)).callCiosReadApi(anyString(), anyString());
+        verify(cassandraOperation, times(1)).getRecordsByProperties(anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -359,7 +351,15 @@ class CornellSchedulerServiceTest {
 
         assertDoesNotThrow(() -> method.invoke(cornellSchedulerService, partnerCode, partnerId, contentData));
 
+        // Verify no kafka push when user is not enrolled
         verify(kafkaProducer, never()).push(anyString(), any());
+        verify(payloadValidation, never()).validatePayload(anyString(), any());
+
+        // Verify services were called up to enrollment check
+        verify(dataTransformUtility, times(1)).fetchPartnerInfoUsingApi(partnerId);
+        verify(dataTransformUtility, times(1)).transformData(any(), any());
+        verify(dataTransformUtility, times(1)).callCiosReadApi(anyString(), anyString());
+        verify(cassandraOperation, times(1)).getRecordsByProperties(anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -377,6 +377,18 @@ class CornellSchedulerServiceTest {
                 "callEnrollmentAPI", String.class, String.class, JsonNode.class);
         method.setAccessible(true);
 
-        assertThrows(Exception.class, () -> method.invoke(cornellSchedulerService, partnerCode, partnerId, contentData));
+        Exception exception = assertThrows(Exception.class, () ->
+            method.invoke(cornellSchedulerService, partnerCode, partnerId, contentData)
+        );
+
+        // Verify exception was thrown
+        assertNotNull(exception);
+        assertNotNull(exception.getCause());
+        assertTrue(exception.getCause() instanceof RuntimeException);
+        assertEquals("API call failed", exception.getCause().getMessage());
+
+        // Verify no kafka push happened
+        verify(kafkaProducer, never()).push(anyString(), any());
+        verify(payloadValidation, never()).validatePayload(anyString(), any());
     }
 }

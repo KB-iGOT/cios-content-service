@@ -151,4 +151,7 @@ public class CbServerProperties {
 
     @Value("${harvard.partner.code}")
     public String harvardPartnerCode;
+
+    @Value("${harvard.allowed.file.extensions:.xlsx,.xls,.csv}")
+    private String harvardAllowedFileExtensions;
 }

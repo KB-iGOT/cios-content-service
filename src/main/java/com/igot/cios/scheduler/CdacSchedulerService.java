@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.RequestBodyDTO;
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.DataTransformUtility;
@@ -19,14 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestTemplate;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
+
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,19 +100,26 @@ public class CdacSchedulerService {
         }
     }
 
-    public JsonNode loadCdacEnrollment() {
+    public SBApiResponse loadCdacEnrollment() {
         log.info("CdacSchedulerService :: loadCdacEnrollment()");
-        RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
-        requestBodyDTO.setServiceCode(cbServerProperties.getCdacEnrollmentServiceCode());
-        requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
-        requestBodyDTO.setHeaderMap(formHeaderMap());
-        String payload = null;
+        SBApiResponse apiResponse = SBApiResponse.createDefaultResponse("cdac.enrollment");
         try {
-            payload = objectMapper.writeValueAsString(requestBodyDTO);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
+            requestBodyDTO.setServiceCode(cbServerProperties.getCdacEnrollmentServiceCode());
+            requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
+            requestBodyDTO.setHeaderMap(formHeaderMap());
+            String payload = objectMapper.writeValueAsString(requestBodyDTO);
+
+            performEnrollmentCall(cbServerProperties.cdacPartnerCode, payload);
+            apiResponse.setResponseCode(HttpStatus.OK);
+            return apiResponse;
+        } catch (Exception e) {
+            log.error("Error in loadCdacEnrollment", e);
+            apiResponse.getParams().setErrmsg("Failed to load CDAC enrollment: " + e.getMessage());
+            apiResponse.getParams().setStatus(Constants.FAILED);
+            apiResponse.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return apiResponse;
         }
-        return performEnrollmentCall(cbServerProperties.cdacPartnerCode, payload);
     }
 
     private Map<String, String> formHeaderMap() {
@@ -135,7 +140,7 @@ public class CdacSchedulerService {
         return urlMap;
     }
 
-    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+    private void performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("CdacSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode, requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
@@ -159,7 +164,6 @@ public class CdacSchedulerService {
             } else {
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);
             }
-            return jsonData;
         } else {
             throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
         }
