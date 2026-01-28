@@ -208,6 +208,7 @@ public class Constants {
     public static final String TRANSFORM_PROGRESS_JSON = "transformProgressJson";
     public static final String ENROLLMENTS = "enrollments";
     public static final String CORNELL_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    public static final String PATH_DELIMITER = "/";
     private Constants() {
     }
 

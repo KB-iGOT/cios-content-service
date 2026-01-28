@@ -1,11 +1,11 @@
 package com.igot.cios.scheduler;
 
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.RequestBodyDTO;
+import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.kafka.KafkaProducer;
 import com.igot.cios.plugins.DataTransformUtility;
@@ -93,18 +93,25 @@ public class CornellSchedulerService{
         return sdf.format(date);
     }
 
-    public JsonNode loadCornellEnrollment() {
+    public SBApiResponse loadCornellEnrollment() {
         log.info("CornellSchedulerService :: loadCornellEnrollment()");
-        RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
-        requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
-        requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
-        String payload = " ";
+        SBApiResponse apiResponse = SBApiResponse.createDefaultResponse("cornell.enrollment");
+
         try {
-            payload = objectMapper.writeValueAsString(requestBodyDTO);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
+            requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
+            requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
+            String payload = objectMapper.writeValueAsString(requestBodyDTO);
+            performEnrollmentCall(cbServerProperties.cornellPartnerCode, payload);
+            apiResponse.setResponseCode(HttpStatus.OK);
+            return apiResponse;
+        } catch (Exception e) {
+            log.error("Error in loadCornellEnrollment", e);
+            apiResponse.getParams().setErrmsg("Failed to load Cornell enrollment: " + e.getMessage());
+            apiResponse.getParams().setStatus(Constants.FAILED);
+            apiResponse.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
+            return apiResponse;
         }
-        return performEnrollmentCall(cbServerProperties.cornellPartnerCode,payload);
     }
 
     private Map<String, String> formUrlMapForEnrollment() {
@@ -121,7 +128,7 @@ public class CornellSchedulerService{
         return urlMap;
     }
 
-    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
+    private void performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("CornellSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
@@ -146,9 +153,9 @@ public class CornellSchedulerService{
             }else{
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);
             }
-            return jsonNode;
+
         } else {
-            throw new RuntimeException("Failed to retrieve externalId. Status code: " + response.getStatusCodeValue());
+            throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
