@@ -175,8 +175,13 @@
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-inline</artifactId>
-			<version>4.5.1</version> <!-- Make sure to use the latest version -->
+			<version>4.5.1</version>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.jcraft</groupId>
+			<artifactId>jsch</artifactId>
+			<version>0.1.55</version>
 		</dependency>
 	</dependencies>
 

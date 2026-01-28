@@ -130,4 +130,25 @@ public class CbServerProperties {
 
     @Value("${sso.config.mapper.update.api}")
     public String ssoConfigMapperUpdateApi;
+
+    @Value("${harvard.sftp.host}")
+    private String harvardSftpHost;
+
+    @Value("${harvard.sftp.port}")
+    private int harvardSftpPort;
+
+    @Value("${harvard.sftp.username}")
+    private String harvardSftpUsername;
+
+    @Value("${harvard.sftp.password}")
+    private String harvardSftpPassword;
+
+    @Value("${harvard.sftp.remote.directory}")
+    private String harvardSftpRemoteDirectory;
+
+    @Value("${harvard.sftp.completed.directory}")
+    private String harvardSftpCompletedDirectory;
+
+    @Value("${harvard.partner.code}")
+    public String harvardPartnerCode;
 }

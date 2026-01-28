@@ -21,6 +21,9 @@ public class CourseScheduler {
     @Autowired
     CdacSchedulerService cdacSchedulerService;
 
+    @Autowired
+    HarvardSchedulerService harvardSchedulerService;
+
     @Value("${scheduler.enabled}")
     private boolean schedulerEnabled;
 
@@ -29,6 +32,9 @@ public class CourseScheduler {
 
     @Value("${cdac.scheduler.enabled}")
     private boolean cdacSchedulerEnabled;
+
+    @Value("${harvard.scheduler.enabled}")
+    private boolean harvardSchedulerEnabled;
 
     @Scheduled(cron = "${scheduler.cron}")
     private void callCornellEnrollmentApi() throws JsonProcessingException{
@@ -51,6 +57,14 @@ public class CourseScheduler {
         if (cdacSchedulerEnabled) {
             log.info("CourseScheduler :: callCourseraEnrollmentApi");
             cdacSchedulerService.loadCdacEnrollment();
+        }
+    }
+
+    @Scheduled(cron = "${harvard.scheduler.cron}")
+    private void callHarvardEnrollmentApi() throws JsonProcessingException {
+        if (harvardSchedulerEnabled) {
+            log.info("CourseScheduler :: callHarvardEnrollmentApi");
+            harvardSchedulerService.loadHarvardEnrollment();
         }
     }
 }
