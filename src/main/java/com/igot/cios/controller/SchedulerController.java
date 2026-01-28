@@ -33,28 +33,24 @@ public class SchedulerController {
 
     @GetMapping("/cornell/progress")
     public ResponseEntity<SBApiResponse> triggerCornellEnrollment() {
-        log.info("SchedulerController :: triggerCornellEnrollment - Manual trigger received");
         SBApiResponse response = cornellSchedulerService.loadCornellEnrollment();
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
     @GetMapping("/coursera/progress")
     public ResponseEntity<SBApiResponse> triggerCourseraEnrollment() {
-        log.info("SchedulerController :: triggerCourseraEnrollment - Manual trigger received");
         SBApiResponse response = courseraSchedulerService.loadCourseraEnrollment();
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
     @GetMapping("/cdac/progress")
     public ResponseEntity<SBApiResponse> triggerCdacEnrollment() {
-        log.info("SchedulerController :: triggerCdacEnrollment - Manual trigger received");
         SBApiResponse response = cdacSchedulerService.loadCdacEnrollment();
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
     @GetMapping("/harvard/progress")
     public ResponseEntity<SBApiResponse> triggerHarvardEnrollment() {
-        log.info("SchedulerController :: triggerHarvardEnrollment - Manual trigger received");
         SBApiResponse response = harvardSchedulerService.loadHarvardEnrollment();
         return new ResponseEntity<>(response, response.getResponseCode());
     }
