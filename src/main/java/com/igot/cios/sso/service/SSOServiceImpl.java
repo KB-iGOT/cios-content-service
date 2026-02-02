@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.SBApiResponse;
+import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.sso.entity.SSOConfiguration;
 import com.igot.cios.sso.repository.SsoRepository;
@@ -13,11 +14,24 @@ import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
+import org.w3c.dom.Document;
 
 
 @Service
@@ -27,11 +41,13 @@ public class SSOServiceImpl implements SSOService {
     private final SsoRepository ssoRepository;
     private final ObjectMapper objectMapper;
     private final PayloadValidation payloadValidation;
+    private final RestTemplate restTemplate;
+
     private static final String UUID_SCRIPT = """
     userId = user.id;
     parts = userId.split(':');
     parts[parts.length - 1];
-""";
+    """;
 
     private static final String UUID_EMAIL_SCRIPT = """
     userId = user.id;
@@ -45,12 +61,14 @@ public class SSOServiceImpl implements SSOService {
             DataTransformUtility dataTransformUtility,
             SsoRepository ssoRepository,
             ObjectMapper objectMapper,
-            PayloadValidation payloadValidation
+            PayloadValidation payloadValidation,
+            RestTemplate restTemplate
     ) {
         this.dataTransformUtility = dataTransformUtility;
         this.ssoRepository = ssoRepository;
         this.objectMapper = objectMapper;
         this.payloadValidation = payloadValidation;
+        this.restTemplate = restTemplate;
     }
 
     @Override
@@ -354,6 +372,255 @@ public class SSOServiceImpl implements SSOService {
                 .add(redirectUrlNode.asText(ssoDetails.path(Constants.ACS_URL).asText()));
 
         ssoData.set(Constants.VALID_REDIRECT_URL, redirectUrls);
+    }
+
+    @Override
+    public SBApiResponse testSamlConfiguration(JsonNode request) {
+        SBApiResponse response = SBApiResponse.createDefaultResponse("api.sso.test");
+
+        String ssoId = request.path(Constants.SSO_ID).asText("");
+        String courseDeeplink = request.path(Constants.COURSE_DEEPLINK).asText("");
+
+        if (StringUtils.isBlank(ssoId)) {
+            return failedResponse(response, Constants.MISSING_SSO_ID);
+        }
+
+        if (StringUtils.isBlank(courseDeeplink)) {
+            return failedResponse(response, Constants.MISSING_COURSE_DEEPLINK);
+        }
+
+        if (!courseDeeplink.startsWith(Constants.HTTP) && !courseDeeplink.startsWith("https://")) {
+            return failedResponse(response, "Invalid courseDeeplink URL");
+        }
+
+        try {
+            String token = dataTransformUtility.getAdminAccessToken();
+            JsonNode client = dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId);
+
+            if (client == null || client.isEmpty()) {
+                return failedResponse(response, "SP not found in Keycloak");
+            }
+
+            String protocol = client.path("protocol").asText("");
+            if (!"saml".equalsIgnoreCase(protocol)) {
+                return failedResponse(response, "Client protocol is not SAML");
+            }
+
+            JsonNode attributes = client.path("attributes");
+            String acsUrl = attributes.path("saml_assertion_consumer_url_post").asText("");
+
+            if (StringUtils.isBlank(acsUrl)) {
+                return failedResponse(response, "Missing ACS URL in SP configuration");
+            }
+
+            if (!isCourseDeeplinkMatchingSpDomain(client, courseDeeplink)) {
+                return failedResponse(response, "Course deeplink does not match SP redirect URI domain");
+            }
+
+            Map<String, Object> vr = checkAndValidateSaml(courseDeeplink, client, acsUrl);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("ssoId", ssoId);
+            result.put("courseDeeplink", courseDeeplink);
+
+            boolean isSuccess = (boolean) vr.getOrDefault("success", false);
+            if (isSuccess) {
+                response.setResult(result);
+                response.getParams().setStatus(Constants.SUCCESS);
+                response.setResponseCode(HttpStatus.OK);
+            } else {
+                response.setResult(result);
+                response.getParams().setStatus(Constants.FAILED);
+                response.getParams().setErrmsg((String) vr.get("message"));
+                response.setResponseCode(HttpStatus.BAD_REQUEST);
+            }
+
+        } catch (Exception e) {
+            return failedResponse(response, "Exception while testing SAML: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+
+    private boolean isCourseDeeplinkMatchingSpDomain(JsonNode client, String courseDeeplink) {
+        try {
+            URI deeplinkUri = URI.create(courseDeeplink);
+            String deeplinkHost = deeplinkUri.getHost();
+
+            JsonNode redirectUris = client.path("redirectUris");
+            if (redirectUris.isArray()) {
+                for (JsonNode redirectUri : redirectUris) {
+                    URI r = URI.create(redirectUri.asText());
+                    String redirectHost = r.getHost();
+
+                    if (deeplinkHost.equalsIgnoreCase(redirectHost)) return true;
+                    if (deeplinkHost.endsWith("." + redirectHost)) return true;
+                }
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
+    private Map<String, Object> checkAndValidateSaml(String courseDeeplink, JsonNode client, String expectedAcsUrl) {
+        Map<String, Object> vr = new HashMap<>();
+        try {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            RestTemplate testRestTemplate = new RestTemplate(factory);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setCacheControl(CacheControl.noCache());
+            headers.set("User-Agent", "Mozilla/5.0");
+
+            ResponseEntity<String> resp = testRestTemplate.exchange(
+                    courseDeeplink,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    String.class
+            );
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                vr.put("success", false);
+                vr.put("message", "SP did not return SAML form. Status: " + resp.getStatusCode());
+                return vr;
+            }
+
+            String body = resp.getBody();
+
+            if (!body.contains("SAMLRequest")) {
+                vr.put("success", false);
+                vr.put("message", "Response does not contain SAMLRequest");
+                return vr;
+            }
+
+
+            org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(body);
+            org.jsoup.nodes.Element form = doc.selectFirst("form");
+            org.jsoup.nodes.Element samlInput = doc.selectFirst("input[name=SAMLRequest]");
+
+            if (form == null || samlInput == null) {
+                vr.put("success", false);
+                vr.put("message", "Missing SAML form or SAMLRequest input");
+                return vr;
+            }
+
+            String actionUrl = form.attr("action");
+            String samlRequest = samlInput.attr("value");
+
+            if (StringUtils.isBlank(actionUrl) || StringUtils.isBlank(samlRequest)) {
+                vr.put("success", false);
+                vr.put("message", "Invalid SAML form (missing action or SAMLRequest)");
+                return vr;
+            }
+
+            String redirectUrl = actionUrl + "?SAMLRequest=" +
+                    URLEncoder.encode(samlRequest, StandardCharsets.UTF_8);
+            return validateSamlRequest(redirectUrl, client, expectedAcsUrl);
+
+        } catch (Exception e) {
+            vr.put("success", false);
+            vr.put("message", "Exception during SP redirect: " + e.getMessage());
+        }
+        return vr;
+    }
+
+    private Map<String, Object> validateSamlRequest(String redirectUrl, JsonNode client, String expectedAcsUrl) {
+        Map<String, Object> vr = new HashMap<>();
+        try {
+            URI uri = URI.create(redirectUrl);
+            Map<String, String> params = Arrays.stream(uri.getQuery().split("&"))
+                    .map(p -> p.split("=", 2))
+                    .collect(Collectors.toMap(
+                            p -> p[0],
+                            p -> URLDecoder.decode(p[1], StandardCharsets.UTF_8)));
+
+            String samlRequest = params.get("SAMLRequest");
+            String xml = inflateAndDecode(samlRequest);
+
+            DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+            f.setNamespaceAware(true);
+            Document doc = f.newDocumentBuilder()
+                    .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+
+            String issuer = doc.getElementsByTagNameNS("*", "Issuer")
+                    .item(0).getTextContent();
+
+            String acs = doc.getDocumentElement()
+                    .getAttribute("AssertionConsumerServiceURL");
+
+            String binding = doc.getDocumentElement()
+                    .getAttribute("ProtocolBinding");
+
+            if (!issuer.equals(client.path("clientId").asText())) {
+                vr.put("success", false);
+                vr.put("message", "Issuer mismatch. Expected: " + client.path("clientId").asText() + ", Found: " + issuer);
+                return vr;
+            }
+
+            if (!expectedAcsUrl.equals(acs)) {
+                vr.put("success", false);
+                vr.put("message", "ACS mismatch. Expected: " + expectedAcsUrl + ", Found: " + acs);
+                return vr;
+            }
+
+            String forcePost = client.path("attributes").path("saml.force.post.binding").asText();
+            if ("true".equalsIgnoreCase(forcePost)
+                    && !"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST".equals(binding)) {
+                vr.put("success", false);
+                vr.put("message", "ProtocolBinding mismatch. Expected HTTP-POST, Found: " + binding);
+                return vr;
+            }
+
+            vr.put("success", true);
+            vr.put("message", "Valid SAMLRequest (Issuer, ACS, Destination, Binding verified)");
+            return vr;
+
+        } catch (Exception e) {
+            vr.put("success", false);
+            vr.put("message", "Failed to parse/validate SAMLRequest: " + e.getMessage());
+            return vr;
+        }
+    }
+
+    private SBApiResponse failedResponse(SBApiResponse response, String errorMessage) {
+        response.getParams().setStatus(Constants.FAILED);
+        response.getParams().setErrmsg(errorMessage);
+        response.setResponseCode(HttpStatus.BAD_REQUEST);
+        return response;
+    }
+
+    private String inflateAndDecode(String encoded) {
+        try {
+            // normalize base64 (fix + → space issue)
+            encoded = encoded.trim().replace(" ", "+");
+
+            byte[] decoded = Base64.getDecoder().decode(encoded);
+
+            try {
+                // Try DEFLATE (Redirect binding)
+                Inflater inflater = new Inflater(true);
+                inflater.setInput(decoded);
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                while (!inflater.finished()) {
+                    int count = inflater.inflate(buffer);
+                    baos.write(buffer, 0, count);
+                }
+                inflater.end();
+                return baos.toString(StandardCharsets.UTF_8);
+
+            } catch (DataFormatException e) {
+                // Not deflated → POST binding
+                return new String(decoded, StandardCharsets.UTF_8);
+            }
+
+        } catch (Exception e) {
+            throw new CiosContentException(Constants.ERROR,
+                    "Failed to decode SAMLRequest: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 

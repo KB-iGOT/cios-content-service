@@ -161,6 +161,7 @@ public class Constants {
     public static final String API_SSO_CREATE = "api.sso.create";
     public static final String API_SSO_UPDATE = "api.sso.update";
     public static final String API_SSO_READ = "api.sso.read";
+    public static final String API_SSO_TEST = "api.sso.test";
     public static final String API_UPLOAD_FILE = "api.upload.file";
     public static final String API_UPLOAD_CIOS_LOGS = "api.upload.cios.logs";
     public static final String API_DELETE_CIOS_CONTENT = "api.delete.cios.content";
@@ -209,6 +210,10 @@ public class Constants {
     public static final String ENROLLMENTS = "enrollments";
     public static final String CORNELL_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
     public static final String PATH_DELIMITER = "/";
+    public static final String MISSING_SSO_ID = "Missing ssoId";
+    public static final String COURSE_DEEPLINK = "courseDeeplink";
+    public static final String MISSING_COURSE_DEEPLINK = "Missing courseDeeplink";
+    public static final String HTTP = "http://";
     private Constants() {
     }
 
