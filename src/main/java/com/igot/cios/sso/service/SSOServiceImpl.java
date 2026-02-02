@@ -15,7 +15,6 @@ import com.igot.cios.util.PayloadValidation;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -23,12 +22,9 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 import org.w3c.dom.Document;
@@ -108,7 +104,7 @@ public class SSOServiceImpl implements SSOService {
         SSOConfiguration savedResponse = ssoRepository.save(configuration);
         Map<String, Object> result = objectMapper.convertValue(
                 savedResponse,
-                new TypeReference<Map<String, Object>>() {
+                new TypeReference<>() {
                 }
         );
         response.setResult(result);
@@ -167,7 +163,7 @@ public class SSOServiceImpl implements SSOService {
         }
         Map<String, Object> result = objectMapper.convertValue(
                 configuration,
-                new TypeReference<Map<String, Object>>() {
+                new TypeReference<>() {
                 }
         );
         response.setResult(result);
