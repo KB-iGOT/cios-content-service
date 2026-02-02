@@ -485,6 +485,12 @@ public class SSOServiceImpl implements SSOService {
 
             String body = resp.getBody();
 
+            if (Objects.isNull(body)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "Response body is null");
+                return validationResult;
+            }
+
             if (!body.contains(Constants.SAML_REQUEST)) {
                 validationResult.put(Constants.SUCCESS, false);
                 validationResult.put(Constants.MESSAGE, "Response does not contain SAMLRequest");
@@ -509,8 +515,6 @@ public class SSOServiceImpl implements SSOService {
                 validationResult.put(Constants.MESSAGE, "Invalid SAML form (missing action or SAMLRequest)");
                 return validationResult;
             }
-
-           // String redirectUrl = actionUrl + "?SAMLRequest=" + URLEncoder.encode(samlRequest, StandardCharsets.UTF_8);
             return validateSamlRequest(samlRequest, client);
 
         } catch (Exception e) {
@@ -523,14 +527,6 @@ public class SSOServiceImpl implements SSOService {
     private Map<String, Object> validateSamlRequest(String samlRequest, JsonNode client) {
         Map<String, Object> validationResult = new HashMap<>();
         try {
-//            URI uri = URI.create(redirectUrl);
-//            Map<String, String> params = Arrays.stream(uri.getQuery().split("&"))
-//                    .map(p -> p.split("=", 2))
-//                    .collect(Collectors.toMap(
-//                            p -> p[0],
-//                            p -> URLDecoder.decode(p[1], StandardCharsets.UTF_8)));
-//
-//            String samlRequest = params.get(Constants.SAML_REQUEST);
             String xml = inflateAndDecode(samlRequest);
 
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
@@ -574,24 +570,26 @@ public class SSOServiceImpl implements SSOService {
 
     private String inflateAndDecode(String encoded) {
         try {
-            encoded = encoded.trim().replace(" ", "+");
             byte[] decoded = Base64.getDecoder().decode(encoded);
-                Inflater inflater = new Inflater(true);
-                inflater.setInput(decoded);
+            Inflater inflater = new Inflater(true);
+            inflater.setInput(decoded);
 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                byte[] buffer = new byte[1024];
-                while (!inflater.finished()) {
-                    int count = inflater.inflate(buffer);
-                    baos.write(buffer, 0, count);
-                }
-                inflater.end();
-                return baos.toString(StandardCharsets.UTF_8);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+
+            while (!inflater.finished()) {
+                int count = inflater.inflate(buffer);
+                baos.write(buffer, 0, count);
+            }
+            inflater.end();
+
+            return baos.toString(StandardCharsets.UTF_8);
+
+        } catch (DataFormatException e) {
+            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
 
         } catch (Exception e) {
-            throw new CiosContentException(Constants.ERROR,
-                    "Failed to decode SAMLRequest: " + e.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CiosContentException("Failed to decode SAMLRequest", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
