@@ -214,6 +214,8 @@ public class Constants {
     public static final String COURSE_DEEPLINK = "courseDeeplink";
     public static final String MISSING_COURSE_DEEPLINK = "Missing courseDeeplink";
     public static final String HTTP = "http://";
+    public static final String SAML_REQUEST = "SAMLRequest";
+
     private Constants() {
     }
 

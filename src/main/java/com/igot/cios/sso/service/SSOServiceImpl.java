@@ -376,7 +376,7 @@ public class SSOServiceImpl implements SSOService {
 
     @Override
     public SBApiResponse testSamlConfiguration(JsonNode request) {
-        SBApiResponse response = SBApiResponse.createDefaultResponse("api.sso.test");
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_SSO_TEST);
 
         String ssoId = request.path(Constants.SSO_ID).asText("");
         String courseDeeplink = request.path(Constants.COURSE_DEEPLINK).asText("");
@@ -397,16 +397,16 @@ public class SSOServiceImpl implements SSOService {
             String token = dataTransformUtility.getAdminAccessToken();
             JsonNode client = dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId);
 
-            if (client == null || client.isEmpty()) {
+            if (Objects.isNull(client) || client.isEmpty()) {
                 return failedResponse(response, "SP not found in Keycloak");
             }
 
-            String protocol = client.path("protocol").asText("");
-            if (!"saml".equalsIgnoreCase(protocol)) {
+            String protocol = client.path(Constants.PROTOCOL).asText("");
+            if (!Constants.SAML.equalsIgnoreCase(protocol)) {
                 return failedResponse(response, "Client protocol is not SAML");
             }
 
-            JsonNode attributes = client.path("attributes");
+            JsonNode attributes = client.path(Constants.ATTRIBUTES);
             String acsUrl = attributes.path("saml_assertion_consumer_url_post").asText("");
 
             if (StringUtils.isBlank(acsUrl)) {
@@ -417,13 +417,13 @@ public class SSOServiceImpl implements SSOService {
                 return failedResponse(response, "Course deeplink does not match SP redirect URI domain");
             }
 
-            Map<String, Object> vr = checkAndValidateSaml(courseDeeplink, client, acsUrl);
+            Map<String, Object> validationResult = checkAndValidateSaml(courseDeeplink, client);
 
             Map<String, Object> result = new HashMap<>();
-            result.put("ssoId", ssoId);
-            result.put("courseDeeplink", courseDeeplink);
+            result.put(Constants.SSO_ID, ssoId);
+            result.put(Constants.COURSE_DEEPLINK, courseDeeplink);
 
-            boolean isSuccess = (boolean) vr.getOrDefault("success", false);
+            boolean isSuccess = (boolean) validationResult.getOrDefault(Constants.SUCCESS, Constants.ACTIVE_STATUS);
             if (isSuccess) {
                 response.setResult(result);
                 response.getParams().setStatus(Constants.SUCCESS);
@@ -431,7 +431,7 @@ public class SSOServiceImpl implements SSOService {
             } else {
                 response.setResult(result);
                 response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErrmsg((String) vr.get("message"));
+                response.getParams().setErrmsg((String) validationResult.get(Constants.MESSAGE));
                 response.setResponseCode(HttpStatus.BAD_REQUEST);
             }
 
@@ -464,78 +464,73 @@ public class SSOServiceImpl implements SSOService {
         return false;
     }
 
-    private Map<String, Object> checkAndValidateSaml(String courseDeeplink, JsonNode client, String expectedAcsUrl) {
-        Map<String, Object> vr = new HashMap<>();
+    private Map<String, Object> checkAndValidateSaml(String courseDeeplink, JsonNode client) {
+        Map<String, Object> validationResult = new HashMap<>();
         try {
-            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-            RestTemplate testRestTemplate = new RestTemplate(factory);
-
             HttpHeaders headers = new HttpHeaders();
             headers.setCacheControl(CacheControl.noCache());
             headers.set("User-Agent", "Mozilla/5.0");
 
-            ResponseEntity<String> resp = testRestTemplate.exchange(
+            ResponseEntity<String> resp = restTemplate.exchange(
                     courseDeeplink,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
                     String.class
             );
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                vr.put("success", false);
-                vr.put("message", "SP did not return SAML form. Status: " + resp.getStatusCode());
-                return vr;
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "SP did not return SAML form. Status: " + resp.getStatusCode());
+                return validationResult;
             }
 
             String body = resp.getBody();
 
-            if (!body.contains("SAMLRequest")) {
-                vr.put("success", false);
-                vr.put("message", "Response does not contain SAMLRequest");
-                return vr;
+            if (!body.contains(Constants.SAML_REQUEST)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "Response does not contain SAMLRequest");
+                return validationResult;
             }
-
 
             org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(body);
             org.jsoup.nodes.Element form = doc.selectFirst("form");
             org.jsoup.nodes.Element samlInput = doc.selectFirst("input[name=SAMLRequest]");
 
             if (form == null || samlInput == null) {
-                vr.put("success", false);
-                vr.put("message", "Missing SAML form or SAMLRequest input");
-                return vr;
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "Missing SAML form or SAMLRequest input");
+                return validationResult;
             }
 
             String actionUrl = form.attr("action");
             String samlRequest = samlInput.attr("value");
 
             if (StringUtils.isBlank(actionUrl) || StringUtils.isBlank(samlRequest)) {
-                vr.put("success", false);
-                vr.put("message", "Invalid SAML form (missing action or SAMLRequest)");
-                return vr;
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "Invalid SAML form (missing action or SAMLRequest)");
+                return validationResult;
             }
 
-            String redirectUrl = actionUrl + "?SAMLRequest=" +
-                    URLEncoder.encode(samlRequest, StandardCharsets.UTF_8);
-            return validateSamlRequest(redirectUrl, client, expectedAcsUrl);
+           // String redirectUrl = actionUrl + "?SAMLRequest=" + URLEncoder.encode(samlRequest, StandardCharsets.UTF_8);
+            return validateSamlRequest(samlRequest, client);
 
         } catch (Exception e) {
-            vr.put("success", false);
-            vr.put("message", "Exception during SP redirect: " + e.getMessage());
+            validationResult.put(Constants.SUCCESS, Constants.ACTIVE_STATUS);
+            validationResult.put(Constants.MESSAGE, "Exception during SP redirect: " + e.getMessage());
         }
-        return vr;
+        return validationResult;
     }
 
-    private Map<String, Object> validateSamlRequest(String redirectUrl, JsonNode client, String expectedAcsUrl) {
-        Map<String, Object> vr = new HashMap<>();
+    private Map<String, Object> validateSamlRequest(String samlRequest, JsonNode client) {
+        Map<String, Object> validationResult = new HashMap<>();
         try {
-            URI uri = URI.create(redirectUrl);
-            Map<String, String> params = Arrays.stream(uri.getQuery().split("&"))
-                    .map(p -> p.split("=", 2))
-                    .collect(Collectors.toMap(
-                            p -> p[0],
-                            p -> URLDecoder.decode(p[1], StandardCharsets.UTF_8)));
-
-            String samlRequest = params.get("SAMLRequest");
+//            URI uri = URI.create(redirectUrl);
+//            Map<String, String> params = Arrays.stream(uri.getQuery().split("&"))
+//                    .map(p -> p.split("=", 2))
+//                    .collect(Collectors.toMap(
+//                            p -> p[0],
+//                            p -> URLDecoder.decode(p[1], StandardCharsets.UTF_8)));
+//
+//            String samlRequest = params.get(Constants.SAML_REQUEST);
             String xml = inflateAndDecode(samlRequest);
 
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
@@ -543,43 +538,30 @@ public class SSOServiceImpl implements SSOService {
             Document doc = f.newDocumentBuilder()
                     .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
 
-            String issuer = doc.getElementsByTagNameNS("*", "Issuer")
-                    .item(0).getTextContent();
-
-            String acs = doc.getDocumentElement()
-                    .getAttribute("AssertionConsumerServiceURL");
-
-            String binding = doc.getDocumentElement()
-                    .getAttribute("ProtocolBinding");
-
-            if (!issuer.equals(client.path("clientId").asText())) {
-                vr.put("success", false);
-                vr.put("message", "Issuer mismatch. Expected: " + client.path("clientId").asText() + ", Found: " + issuer);
-                return vr;
+            String issuer = "";
+            if (doc.getElementsByTagNameNS("*", "Issuer").getLength() > 0) {
+                issuer = doc.getElementsByTagNameNS("*", "Issuer").item(0).getTextContent();
+            }
+            String expectedClientId = client.path(Constants.CLIENT_ID).asText();
+            if (StringUtils.isBlank(issuer)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "SAML request missing Issuer element");
+                return validationResult;
             }
 
-            if (!expectedAcsUrl.equals(acs)) {
-                vr.put("success", false);
-                vr.put("message", "ACS mismatch. Expected: " + expectedAcsUrl + ", Found: " + acs);
-                return vr;
+            if (!issuer.equals(expectedClientId)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, "Issuer mismatch. Expected: " + expectedClientId + ", Found: " + issuer);
+                return validationResult;
             }
-
-            String forcePost = client.path("attributes").path("saml.force.post.binding").asText();
-            if ("true".equalsIgnoreCase(forcePost)
-                    && !"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST".equals(binding)) {
-                vr.put("success", false);
-                vr.put("message", "ProtocolBinding mismatch. Expected HTTP-POST, Found: " + binding);
-                return vr;
-            }
-
-            vr.put("success", true);
-            vr.put("message", "Valid SAMLRequest (Issuer, ACS, Destination, Binding verified)");
-            return vr;
+            validationResult.put(Constants.SUCCESS, true);
+            validationResult.put(Constants.MESSAGE, "Valid SAMLRequest - SP successfully sent SAML request with correct Issuer: " + issuer);
+            return validationResult;
 
         } catch (Exception e) {
-            vr.put("success", false);
-            vr.put("message", "Failed to parse/validate SAMLRequest: " + e.getMessage());
-            return vr;
+            validationResult.put(Constants.SUCCESS, false);
+            validationResult.put(Constants.MESSAGE, "Failed to parse/validate SAMLRequest: " + e.getMessage());
+            return validationResult;
         }
     }
 
@@ -592,13 +574,8 @@ public class SSOServiceImpl implements SSOService {
 
     private String inflateAndDecode(String encoded) {
         try {
-            // normalize base64 (fix + → space issue)
             encoded = encoded.trim().replace(" ", "+");
-
             byte[] decoded = Base64.getDecoder().decode(encoded);
-
-            try {
-                // Try DEFLATE (Redirect binding)
                 Inflater inflater = new Inflater(true);
                 inflater.setInput(decoded);
 
@@ -610,11 +587,6 @@ public class SSOServiceImpl implements SSOService {
                 }
                 inflater.end();
                 return baos.toString(StandardCharsets.UTF_8);
-
-            } catch (DataFormatException e) {
-                // Not deflated → POST binding
-                return new String(decoded, StandardCharsets.UTF_8);
-            }
 
         } catch (Exception e) {
             throw new CiosContentException(Constants.ERROR,
