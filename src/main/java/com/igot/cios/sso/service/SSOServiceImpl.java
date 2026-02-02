@@ -420,12 +420,11 @@ public class SSOServiceImpl implements SSOService {
             result.put(Constants.COURSE_DEEPLINK, courseDeeplink);
 
             boolean isSuccess = (boolean) validationResult.getOrDefault(Constants.SUCCESS, Constants.ACTIVE_STATUS);
+            response.setResult(result);
             if (isSuccess) {
-                response.setResult(result);
                 response.getParams().setStatus(Constants.SUCCESS);
                 response.setResponseCode(HttpStatus.OK);
             } else {
-                response.setResult(result);
                 response.getParams().setStatus(Constants.FAILED);
                 response.getParams().setErrmsg((String) validationResult.get(Constants.MESSAGE));
                 response.setResponseCode(HttpStatus.BAD_REQUEST);
