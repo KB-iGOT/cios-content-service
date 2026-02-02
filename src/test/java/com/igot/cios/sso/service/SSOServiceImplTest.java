@@ -1,7 +1,9 @@
 package com.igot.cios.sso.service;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.SBApiResponse;
 import com.igot.cios.plugins.DataTransformUtility;
@@ -14,11 +16,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +42,9 @@ class SSOServiceImplTest {
 
     @Mock
     private PayloadValidation payloadValidation;
+
+    @Mock
+    private RestTemplate restTemplate;
 
     private ObjectMapper objectMapper;
 
@@ -48,7 +61,8 @@ class SSOServiceImplTest {
                 dataTransformUtility,
                 ssoRepository,
                 objectMapper,
-                payloadValidation
+                payloadValidation,
+                restTemplate
         );
     }
 
@@ -204,7 +218,7 @@ class SSOServiceImplTest {
 
         when(ssoRepository.findById(partnerId)).thenReturn(Optional.of(existingConfig));
         when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
-        when(dataTransformUtility.getExistingMappers(eq(token), eq(ssoId))).thenReturn(new HashMap<>());
+        when(dataTransformUtility.getExistingMappers((token), (ssoId))).thenReturn(new HashMap<>());
         doNothing().when(dataTransformUtility).updateSsoConfiguration(anyString(), anyString(), any());
         doNothing().when(payloadValidation).validatePayload(anyString(), any());
         when(ssoRepository.save(any())).thenReturn(existingConfig);
@@ -249,6 +263,373 @@ class SSOServiceImplTest {
         return node;
     }
 
+    @Test
+    void testSamlConfiguration_missingSsoId() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals(Constants.MISSING_SSO_ID, response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_missingCourseDeeplink() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals(Constants.MISSING_COURSE_DEEPLINK, response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_invalidCourseDeeplinkUrl() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "ftp://invalid.com");
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals("Invalid courseDeeplink URL", response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_spNotFoundInKeycloak() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(null);
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals("SP not found in Keycloak", response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_clientProtocolNotSaml() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        ObjectNode client = objectMapper.createObjectNode();
+        client.put(Constants.PROTOCOL, "openid-connect");
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(client);
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals("Client protocol is not SAML", response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_missingAcsUrl() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        ObjectNode client = objectMapper.createObjectNode();
+        client.put(Constants.PROTOCOL, Constants.SAML);
+        client.set(Constants.ATTRIBUTES, objectMapper.createObjectNode());
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(client);
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals("Missing ACS URL in SP configuration", response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_courseDeeplinkDomainMismatch() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://different.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertEquals("Course deeplink does not match SP redirect URI domain", response.getParams().getErrmsg());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_spDidNotReturnSamlForm() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.status(HttpStatus.NOT_FOUND).body(null));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("SP did not return SAML form"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_responseDoesNotContainSamlRequest() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+        String htmlWithoutSaml = "<html><body><p>No SAML here</p></body></html>";
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(htmlWithoutSaml));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("Response does not contain SAMLRequest"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_missingSamlFormOrInput() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+        String htmlWithSamlButNoForm = "<html><body><p>SAMLRequest mentioned but no form</p></body></html>";
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(htmlWithSamlButNoForm));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("Missing SAML form or SAMLRequest input"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_invalidSamlFormMissingAction() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+        String htmlWithInvalidForm = """
+            <html>
+            <body>
+            <form method="post">
+                <input type="hidden" name="SAMLRequest" value="encodedSamlRequest"/>
+            </form>
+            </body>
+            </html>
+            """;
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(htmlWithInvalidForm));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("Invalid SAML form"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_validSamlRequestWithCorrectIssuer() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+
+        String validSamlXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="id123" Version="2.0">
+                <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">test-client</saml:Issuer>
+            </samlp:AuthnRequest>
+            """;
+
+        String base64EncodedSaml = Base64.getEncoder().encodeToString(validSamlXml.getBytes(StandardCharsets.UTF_8));
+
+        String samlFormHtml = String.format("""
+            <html>
+            <body>
+            <form method="post" action="https://idp.example.com/saml/sso">
+                <input type="hidden" name="SAMLRequest" value="%s"/>
+            </form>
+            </body>
+            </html>
+            """, base64EncodedSaml);
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(samlFormHtml));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.SUCCESS, response.getParams().getStatus());
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertNotNull(response.getResult());
+    }
+
+    @Test
+    void testSamlConfiguration_issuerMismatch() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+
+        String invalidSamlXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="id123" Version="2.0">
+                <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">wrong-issuer</saml:Issuer>
+            </samlp:AuthnRequest>
+            """;
+
+        String base64EncodedSaml = Base64.getEncoder().encodeToString(invalidSamlXml.getBytes(StandardCharsets.UTF_8));
+
+        String samlFormHtml = String.format("""
+            <html>
+            <body>
+            <form method="post" action="https://idp.example.com/saml/sso">
+                <input type="hidden" name="SAMLRequest" value="%s"/>
+            </form>
+            </body>
+            </html>
+            """, base64EncodedSaml);
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(samlFormHtml));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("Issuer mismatch"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_samlRequestMissingIssuer() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+
+        String samlXmlWithoutIssuer = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="id123" Version="2.0">
+            </samlp:AuthnRequest>
+            """;
+
+        String base64EncodedSaml = Base64.getEncoder().encodeToString(samlXmlWithoutIssuer.getBytes(StandardCharsets.UTF_8));
+
+        String samlFormHtml = String.format("""
+            <html>
+            <body>
+            <form method="post" action="https://idp.example.com/saml/sso">
+                <input type="hidden" name="SAMLRequest" value="%s"/>
+            </form>
+            </body>
+            </html>
+            """, base64EncodedSaml);
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(samlFormHtml));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("SAML request missing Issuer element"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_exceptionDuringProcessing() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        when(dataTransformUtility.getAdminAccessToken()).thenThrow(new RuntimeException("Token fetch failed"));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("Exception while testing SAML"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    @Test
+    void testSamlConfiguration_restTemplateThrowsException() {
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put(Constants.SSO_ID, ssoId);
+        request.put(Constants.COURSE_DEEPLINK, "https://example.com/course/123");
+
+        JsonNode keycloakClient = setupKeycloakClientResponse();
+
+        when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
+        when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
+                .thenThrow(new RuntimeException("Connection timeout"));
+
+        SBApiResponse response = service.testSamlConfiguration(request);
+
+        assertEquals(Constants.FAILED, response.getParams().getStatus());
+        assertTrue(response.getParams().getErrmsg().contains("Exception during SP redirect"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+    }
+
+    private JsonNode setupKeycloakClientResponse() {
+        ObjectNode client = objectMapper.createObjectNode();
+        client.put(Constants.CLIENT_ID, "test-client");
+        client.put(Constants.PROTOCOL, Constants.SAML);
+
+        ObjectNode attributes = objectMapper.createObjectNode();
+        attributes.put("saml_assertion_consumer_url_post", "https://example.com/acs");
+        client.set(Constants.ATTRIBUTES, attributes);
+
+        ArrayNode redirectUris = objectMapper.createArrayNode();
+        redirectUris.add("https://example.com/callback");
+        redirectUris.add("https://example.com/*");
+        client.set("redirectUris", redirectUris);
+
+        return client;
+    }
 
 }
-
