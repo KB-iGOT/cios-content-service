@@ -233,6 +233,11 @@ public class Constants {
     public static final String ISSUER_MISMATCH = "Issuer mismatch. Expected: ";
     public static final String VALID_SAML_REQUEST = "Valid SAMLRequest - SP successfully sent SAML request with correct Issuer: ";
     public static final String SAML_REQUEST_PARSE_FAILED = "Failed to parse/validate SAMLRequest: ";
+    public static final String SP_NOTFOUND_IN_KEYCLOAK = "SP not found in Keycloak";
+    public static final String CLIENT_PROTOCOL_NOT_SAML = "Client protocol is not SAML";
+    public static final String MISSING_ASC_URL = "Missing ACS URL in SP configuration";
+    public static final String COURSE_DEEPLINK_MISMATCH = "Course deeplink does not match SP redirect URI domain";
+    public static final String INVALID_COURSE_DEEPLINK = "Invalid courseDeeplink URL";
 
     private Constants() {
     }

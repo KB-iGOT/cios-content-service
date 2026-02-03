@@ -388,7 +388,7 @@ public class SSOServiceImpl implements SSOService {
         }
 
         if (!courseDeeplink.startsWith(Constants.HTTP) && !courseDeeplink.startsWith("https://")) {
-            return failedResponse(response, "Invalid courseDeeplink URL");
+            return failedResponse(response, Constants.INVALID_COURSE_DEEPLINK);
         }
 
         try {
@@ -396,23 +396,23 @@ public class SSOServiceImpl implements SSOService {
             JsonNode client = dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId);
 
             if (Objects.isNull(client) || client.isEmpty()) {
-                return failedResponse(response, "SP not found in Keycloak");
+                return failedResponse(response, Constants.SP_NOTFOUND_IN_KEYCLOAK);
             }
 
             String protocol = client.path(Constants.PROTOCOL).asText("");
             if (!Constants.SAML.equalsIgnoreCase(protocol)) {
-                return failedResponse(response, "Client protocol is not SAML");
+                return failedResponse(response, Constants.CLIENT_PROTOCOL_NOT_SAML);
             }
 
             JsonNode attributes = client.path(Constants.ATTRIBUTES);
-            String acsUrl = attributes.path("saml_assertion_consumer_url_post").asText("");
+            String acsUrl = attributes.path(Constants.SAML_ASSERTION_CONSUMER_URL_POST).asText("");
 
             if (StringUtils.isBlank(acsUrl)) {
-                return failedResponse(response, "Missing ACS URL in SP configuration");
+                return failedResponse(response, Constants.MISSING_ASC_URL);
             }
 
             if (!isCourseDeeplinkMatchingSpDomain(client, courseDeeplink)) {
-                return failedResponse(response, "Course deeplink does not match SP redirect URI domain");
+                return failedResponse(response, Constants.COURSE_DEEPLINK_MISMATCH);
             }
 
             Map<String, Object> validationResult = checkAndValidateSaml(courseDeeplink, client);
