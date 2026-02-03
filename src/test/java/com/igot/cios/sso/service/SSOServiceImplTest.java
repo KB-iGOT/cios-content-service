@@ -493,6 +493,7 @@ class SSOServiceImplTest {
 
         when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
         when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(dataTransformUtility.inflateAndDecode(anyString())).thenReturn(validSamlXml);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(samlFormHtml));
 
@@ -532,6 +533,7 @@ class SSOServiceImplTest {
 
         when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
         when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(dataTransformUtility.inflateAndDecode(anyString())).thenReturn(invalidSamlXml);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(samlFormHtml));
 
@@ -570,6 +572,7 @@ class SSOServiceImplTest {
 
         when(dataTransformUtility.getAdminAccessToken()).thenReturn(token);
         when(dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId)).thenReturn(keycloakClient);
+        when(dataTransformUtility.inflateAndDecode(anyString())).thenReturn(samlXmlWithoutIssuer);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(samlFormHtml));
 
