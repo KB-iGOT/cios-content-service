@@ -23,7 +23,6 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -41,20 +40,15 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.net.http.HttpRequest;
-
-import static javax.xml.bind.DatatypeConverter.parseDate;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
 
 @Slf4j
 @Component
@@ -835,6 +829,57 @@ public class DataTransformUtility {
                     e.getMessage(),
                     HttpStatus.INTERNAL_SERVER_ERROR
             );
+        }
+    }
+
+    public JsonNode getSsoConfigurationFromKeycloak(String token, String clientId) {
+        try {
+            String url = cbServerProperties.keycloakUrl + cbServerProperties.getSsoConfigReadApi() + clientId;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    JsonNode.class
+            );
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return response.getBody();
+            } else {
+                throw new CiosContentException(Constants.ERROR, "Failed to retrieve SSO configuration. Status code: ", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } catch (Exception e) {
+            log.error("Error while fetching SSO configuration from Keycloak", e.getMessage());
+            throw new CiosContentException("Error while fetching SSO configuration from Keycloak", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String inflateAndDecode(String encoded) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(encoded);
+            Inflater inflater = new Inflater(true);
+            inflater.setInput(decoded);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+
+            while (!inflater.finished()) {
+                int count = inflater.inflate(buffer);
+                baos.write(buffer, 0, count);
+            }
+            inflater.end();
+
+            return baos.toString(StandardCharsets.UTF_8);
+
+        } catch (DataFormatException e) {
+            log.error("Error while inflating SAMLRequest", e.getMessage());
+            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
+
+        } catch (Exception e) {
+            log.error("Error while decoding SAMLRequest", e.getMessage());
+            throw new CiosContentException("Failed to decode SAMLRequest", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

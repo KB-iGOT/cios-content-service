@@ -6,20 +6,32 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.SBApiResponse;
+import com.igot.cios.exception.CiosContentException;
 import com.igot.cios.plugins.DataTransformUtility;
 import com.igot.cios.sso.entity.SSOConfiguration;
 import com.igot.cios.sso.repository.SsoRepository;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
+import org.w3c.dom.Document;
 
 
+@Slf4j
 @Service
 public class SSOServiceImpl implements SSOService {
 
@@ -27,11 +39,13 @@ public class SSOServiceImpl implements SSOService {
     private final SsoRepository ssoRepository;
     private final ObjectMapper objectMapper;
     private final PayloadValidation payloadValidation;
+    private final RestTemplate restTemplate;
+
     private static final String UUID_SCRIPT = """
     userId = user.id;
     parts = userId.split(':');
     parts[parts.length - 1];
-""";
+    """;
 
     private static final String UUID_EMAIL_SCRIPT = """
     userId = user.id;
@@ -45,12 +59,14 @@ public class SSOServiceImpl implements SSOService {
             DataTransformUtility dataTransformUtility,
             SsoRepository ssoRepository,
             ObjectMapper objectMapper,
-            PayloadValidation payloadValidation
+            PayloadValidation payloadValidation,
+            RestTemplate restTemplate
     ) {
         this.dataTransformUtility = dataTransformUtility;
         this.ssoRepository = ssoRepository;
         this.objectMapper = objectMapper;
         this.payloadValidation = payloadValidation;
+        this.restTemplate = restTemplate;
     }
 
     @Override
@@ -90,7 +106,7 @@ public class SSOServiceImpl implements SSOService {
         SSOConfiguration savedResponse = ssoRepository.save(configuration);
         Map<String, Object> result = objectMapper.convertValue(
                 savedResponse,
-                new TypeReference<Map<String, Object>>() {
+                new TypeReference<>() {
                 }
         );
         response.setResult(result);
@@ -149,7 +165,7 @@ public class SSOServiceImpl implements SSOService {
         }
         Map<String, Object> result = objectMapper.convertValue(
                 configuration,
-                new TypeReference<Map<String, Object>>() {
+                new TypeReference<>() {
                 }
         );
         response.setResult(result);
@@ -354,6 +370,201 @@ public class SSOServiceImpl implements SSOService {
                 .add(redirectUrlNode.asText(ssoDetails.path(Constants.ACS_URL).asText()));
 
         ssoData.set(Constants.VALID_REDIRECT_URL, redirectUrls);
+    }
+
+    @Override
+    public SBApiResponse testSamlConfiguration(JsonNode request) {
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_SSO_TEST);
+
+        String ssoId = request.path(Constants.SSO_ID).asText("");
+        String courseDeeplink = request.path(Constants.COURSE_DEEPLINK).asText("");
+
+        if (StringUtils.isBlank(ssoId)) {
+            return failedResponse(response, Constants.MISSING_SSO_ID);
+        }
+
+        if (StringUtils.isBlank(courseDeeplink)) {
+            return failedResponse(response, Constants.MISSING_COURSE_DEEPLINK);
+        }
+
+        if (!courseDeeplink.startsWith(Constants.HTTP) && !courseDeeplink.startsWith("https://")) {
+            return failedResponse(response, Constants.INVALID_COURSE_DEEPLINK);
+        }
+
+        try {
+            String token = dataTransformUtility.getAdminAccessToken();
+            JsonNode client = dataTransformUtility.getSsoConfigurationFromKeycloak(token, ssoId);
+
+            if (Objects.isNull(client) || client.isEmpty()) {
+                return failedResponse(response, Constants.SP_NOTFOUND_IN_KEYCLOAK);
+            }
+
+            String protocol = client.path(Constants.PROTOCOL).asText("");
+            if (!Constants.SAML.equalsIgnoreCase(protocol)) {
+                return failedResponse(response, Constants.CLIENT_PROTOCOL_NOT_SAML);
+            }
+
+            JsonNode attributes = client.path(Constants.ATTRIBUTES);
+            String acsUrl = attributes.path(Constants.SAML_ASSERTION_CONSUMER_URL_POST).asText("");
+
+            if (StringUtils.isBlank(acsUrl)) {
+                return failedResponse(response, Constants.MISSING_ASC_URL);
+            }
+
+            if (!isCourseDeeplinkMatchingSpDomain(client, courseDeeplink)) {
+                return failedResponse(response, Constants.COURSE_DEEPLINK_MISMATCH);
+            }
+
+            Map<String, Object> validationResult = checkAndValidateSaml(courseDeeplink, client);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put(Constants.SSO_ID, ssoId);
+            result.put(Constants.COURSE_DEEPLINK, courseDeeplink);
+
+            boolean isSuccess = (boolean) validationResult.getOrDefault(Constants.SUCCESS, Constants.ACTIVE_STATUS);
+            response.setResult(result);
+            if (isSuccess) {
+                response.getParams().setStatus(Constants.SUCCESS);
+                response.setResponseCode(HttpStatus.OK);
+            } else {
+                response.getParams().setStatus(Constants.FAILED);
+                response.getParams().setErrmsg((String) validationResult.get(Constants.MESSAGE));
+                response.setResponseCode(HttpStatus.BAD_REQUEST);
+            }
+
+        } catch (Exception e) {
+            return failedResponse(response, "Exception while testing SAML: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+
+    private boolean isCourseDeeplinkMatchingSpDomain(JsonNode client, String courseDeeplink) {
+        try {
+            URI deeplinkUri = URI.create(courseDeeplink);
+            String deeplinkHost = deeplinkUri.getHost();
+
+            JsonNode redirectUris = client.path(Constants.REDIRECT_URIS);
+            if (redirectUris.isArray()) {
+                for (JsonNode redirectUri : redirectUris) {
+                    URI r = URI.create(redirectUri.asText());
+                    String redirectHost = r.getHost();
+
+                    if (deeplinkHost.equalsIgnoreCase(redirectHost)) return true;
+                    if (deeplinkHost.endsWith("." + redirectHost)) return true;
+                }
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
+    private Map<String, Object> checkAndValidateSaml(String courseDeeplink, JsonNode client) {
+        Map<String, Object> validationResult = new HashMap<>();
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setCacheControl(CacheControl.noCache());
+            headers.set(Constants.USER_AGENT, Constants.MOZILLA);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    courseDeeplink,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    String.class
+            );
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.SP_SAML_FORM_NOTFOUND + resp.getStatusCode());
+                return validationResult;
+            }
+
+            String body = resp.getBody();
+
+            if (Objects.isNull(body)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.RESPOND_BODY_NULL);
+                return validationResult;
+            }
+
+            if (!body.contains(Constants.SAML_REQUEST)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_NOTFOUND);
+                return validationResult;
+            }
+
+            org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(body);
+            org.jsoup.nodes.Element form = doc.selectFirst(Constants.FORM);
+            org.jsoup.nodes.Element samlInput = doc.selectFirst(Constants.INPUT_SAMLREQUEST);
+
+            if (form == null || samlInput == null) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.MISSING_SAML);
+                return validationResult;
+            }
+
+            String actionUrl = form.attr(Constants.ACTION);
+            String samlRequest = samlInput.attr(Constants.VALUE);
+
+            if (StringUtils.isBlank(actionUrl) || StringUtils.isBlank(samlRequest)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.INVALID_SAML);
+                return validationResult;
+            }
+            return validateSamlRequest(samlRequest, client);
+
+        } catch (Exception e) {
+            log.error("Exception during SP SAML validation: ", e.getMessage());
+            validationResult.put(Constants.SUCCESS, Constants.ACTIVE_STATUS);
+            validationResult.put(Constants.MESSAGE, Constants.SP_REDIRECT_EXCEPTION + e.getMessage());
+        }
+        return validationResult;
+    }
+
+    private Map<String, Object> validateSamlRequest(String samlRequest, JsonNode client) {
+        Map<String, Object> validationResult = new HashMap<>();
+        try {
+            String xml = dataTransformUtility.inflateAndDecode(samlRequest);
+
+            DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+            f.setNamespaceAware(true);
+            Document doc = f.newDocumentBuilder()
+                    .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+
+            String issuer = "";
+            if (doc.getElementsByTagNameNS(Constants.ASTERIC, Constants.ISSUER).getLength() > 0) {
+                issuer = doc.getElementsByTagNameNS(Constants.ASTERIC, Constants.ISSUER).item(0).getTextContent();
+            }
+            String expectedClientId = client.path(Constants.CLIENT_ID).asText();
+            if (StringUtils.isBlank(issuer)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_MISSING);
+                return validationResult;
+            }
+
+            if (!issuer.equals(expectedClientId)) {
+                validationResult.put(Constants.SUCCESS, false);
+                validationResult.put(Constants.MESSAGE, Constants.ISSUER_MISMATCH + expectedClientId + ", Found: " + issuer);
+                return validationResult;
+            }
+            validationResult.put(Constants.SUCCESS, true);
+            validationResult.put(Constants.MESSAGE, Constants.VALID_SAML_REQUEST + issuer);
+            return validationResult;
+
+        } catch (Exception e) {
+            log.error("Exception during SAML request validation: ", e.getMessage());
+            validationResult.put(Constants.SUCCESS, false);
+            validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_PARSE_FAILED + e.getMessage());
+            return validationResult;
+        }
+    }
+
+    private SBApiResponse failedResponse(SBApiResponse response, String errorMessage) {
+        response.getParams().setStatus(Constants.FAILED);
+        response.getParams().setErrmsg(errorMessage);
+        response.setResponseCode(HttpStatus.BAD_REQUEST);
+        return response;
     }
 
 
