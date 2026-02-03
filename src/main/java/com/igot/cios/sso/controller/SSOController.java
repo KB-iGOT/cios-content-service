@@ -38,7 +38,7 @@ public class SSOController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PostMapping("/test")
+    @PostMapping("/validateSaml")
     public ResponseEntity<SBApiResponse> testSamlConfiguration(
             @RequestBody JsonNode request) {
         SBApiResponse response = service.testSamlConfiguration(request);

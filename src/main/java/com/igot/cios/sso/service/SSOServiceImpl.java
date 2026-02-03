@@ -443,7 +443,7 @@ public class SSOServiceImpl implements SSOService {
             URI deeplinkUri = URI.create(courseDeeplink);
             String deeplinkHost = deeplinkUri.getHost();
 
-            JsonNode redirectUris = client.path("redirectUris");
+            JsonNode redirectUris = client.path(Constants.REDIRECT_URIS);
             if (redirectUris.isArray()) {
                 for (JsonNode redirectUri : redirectUris) {
                     URI r = URI.create(redirectUri.asText());
@@ -464,7 +464,7 @@ public class SSOServiceImpl implements SSOService {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setCacheControl(CacheControl.noCache());
-            headers.set("User-Agent", "Mozilla/5.0");
+            headers.set(Constants.USER_AGENT, Constants.MOZILLA);
 
             ResponseEntity<String> resp = restTemplate.exchange(
                     courseDeeplink,
@@ -474,7 +474,7 @@ public class SSOServiceImpl implements SSOService {
             );
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "SP did not return SAML form. Status: " + resp.getStatusCode());
+                validationResult.put(Constants.MESSAGE, Constants.SP_SAML_FORM_NOTFOUND + resp.getStatusCode());
                 return validationResult;
             }
 
@@ -482,39 +482,39 @@ public class SSOServiceImpl implements SSOService {
 
             if (Objects.isNull(body)) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "Response body is null");
+                validationResult.put(Constants.MESSAGE, Constants.RESPOND_BODY_NULL);
                 return validationResult;
             }
 
             if (!body.contains(Constants.SAML_REQUEST)) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "Response does not contain SAMLRequest");
+                validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_NOTFOUND);
                 return validationResult;
             }
 
             org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(body);
-            org.jsoup.nodes.Element form = doc.selectFirst("form");
-            org.jsoup.nodes.Element samlInput = doc.selectFirst("input[name=SAMLRequest]");
+            org.jsoup.nodes.Element form = doc.selectFirst(Constants.FORM);
+            org.jsoup.nodes.Element samlInput = doc.selectFirst(Constants.INPUT_SAMLREQUEST);
 
             if (form == null || samlInput == null) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "Missing SAML form or SAMLRequest input");
+                validationResult.put(Constants.MESSAGE, Constants.MISSING_SAML);
                 return validationResult;
             }
 
-            String actionUrl = form.attr("action");
-            String samlRequest = samlInput.attr("value");
+            String actionUrl = form.attr(Constants.ACTION);
+            String samlRequest = samlInput.attr(Constants.VALUE);
 
             if (StringUtils.isBlank(actionUrl) || StringUtils.isBlank(samlRequest)) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "Invalid SAML form (missing action or SAMLRequest)");
+                validationResult.put(Constants.MESSAGE, Constants.INVALID_SAML);
                 return validationResult;
             }
             return validateSamlRequest(samlRequest, client);
 
         } catch (Exception e) {
             validationResult.put(Constants.SUCCESS, Constants.ACTIVE_STATUS);
-            validationResult.put(Constants.MESSAGE, "Exception during SP redirect: " + e.getMessage());
+            validationResult.put(Constants.MESSAGE, Constants.SP_REDIRECT_EXCEPTION + e.getMessage());
         }
         return validationResult;
     }
@@ -522,7 +522,7 @@ public class SSOServiceImpl implements SSOService {
     private Map<String, Object> validateSamlRequest(String samlRequest, JsonNode client) {
         Map<String, Object> validationResult = new HashMap<>();
         try {
-            String xml = inflateAndDecode(samlRequest);
+            String xml = dataTransformUtility.inflateAndDecode(samlRequest);
 
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
             f.setNamespaceAware(true);
@@ -530,28 +530,28 @@ public class SSOServiceImpl implements SSOService {
                     .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
 
             String issuer = "";
-            if (doc.getElementsByTagNameNS("*", "Issuer").getLength() > 0) {
-                issuer = doc.getElementsByTagNameNS("*", "Issuer").item(0).getTextContent();
+            if (doc.getElementsByTagNameNS(Constants.ASTERIC, Constants.ISSUER).getLength() > 0) {
+                issuer = doc.getElementsByTagNameNS(Constants.ASTERIC, Constants.ISSUER).item(0).getTextContent();
             }
             String expectedClientId = client.path(Constants.CLIENT_ID).asText();
             if (StringUtils.isBlank(issuer)) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "SAML request missing Issuer element");
+                validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_MISSING);
                 return validationResult;
             }
 
             if (!issuer.equals(expectedClientId)) {
                 validationResult.put(Constants.SUCCESS, false);
-                validationResult.put(Constants.MESSAGE, "Issuer mismatch. Expected: " + expectedClientId + ", Found: " + issuer);
+                validationResult.put(Constants.MESSAGE, Constants.ISSUER_MISMATCH + expectedClientId + ", Found: " + issuer);
                 return validationResult;
             }
             validationResult.put(Constants.SUCCESS, true);
-            validationResult.put(Constants.MESSAGE, "Valid SAMLRequest - SP successfully sent SAML request with correct Issuer: " + issuer);
+            validationResult.put(Constants.MESSAGE, Constants.VALID_SAML_REQUEST + issuer);
             return validationResult;
 
         } catch (Exception e) {
             validationResult.put(Constants.SUCCESS, false);
-            validationResult.put(Constants.MESSAGE, "Failed to parse/validate SAMLRequest: " + e.getMessage());
+            validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_PARSE_FAILED + e.getMessage());
             return validationResult;
         }
     }
@@ -561,31 +561,6 @@ public class SSOServiceImpl implements SSOService {
         response.getParams().setErrmsg(errorMessage);
         response.setResponseCode(HttpStatus.BAD_REQUEST);
         return response;
-    }
-
-    private String inflateAndDecode(String encoded) {
-        try {
-            byte[] decoded = Base64.getDecoder().decode(encoded);
-            Inflater inflater = new Inflater(true);
-            inflater.setInput(decoded);
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            byte[] buffer = new byte[1024];
-
-            while (!inflater.finished()) {
-                int count = inflater.inflate(buffer);
-                baos.write(buffer, 0, count);
-            }
-            inflater.end();
-
-            return baos.toString(StandardCharsets.UTF_8);
-
-        } catch (DataFormatException e) {
-            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
-
-        } catch (Exception e) {
-            throw new CiosContentException("Failed to decode SAMLRequest", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
     }
 
 

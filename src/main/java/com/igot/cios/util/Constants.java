@@ -215,6 +215,24 @@ public class Constants {
     public static final String MISSING_COURSE_DEEPLINK = "Missing courseDeeplink";
     public static final String HTTP = "http://";
     public static final String SAML_REQUEST = "SAMLRequest";
+    public static final String USER_AGENT = "User-Agent";
+    public static final String MOZILLA = "Mozilla/5.0";
+    public static final String ISSUER = "Issuer";
+    public static final String ASTERIC = "*";
+    public static final String SP_SAML_FORM_NOTFOUND = "SP did not return SAML form. Status: ";
+    public static final String RESPOND_BODY_NULL = "Response body is null";
+    public static final String SAML_REQUEST_NOTFOUND = "Response does not contain SAMLRequest";
+    public static final String FORM = "form";
+    public static final String INPUT_SAMLREQUEST = "input[name=SAMLRequest]";
+    public static final String MISSING_SAML = "Missing SAML form or SAMLRequest input";
+    public static final String ACTION = "action";
+    public static final String VALUE = "value";
+    public static final String INVALID_SAML = "Invalid SAML form (missing action or SAMLRequest)";
+    public static final String SP_REDIRECT_EXCEPTION = "Exception during SP redirect: ";
+    public static final String SAML_REQUEST_MISSING = "SAML request missing Issuer element";
+    public static final String ISSUER_MISMATCH = "Issuer mismatch. Expected: ";
+    public static final String VALID_SAML_REQUEST = "Valid SAMLRequest - SP successfully sent SAML request with correct Issuer: ";
+    public static final String SAML_REQUEST_PARSE_FAILED = "Failed to parse/validate SAMLRequest: ";
 
     private Constants() {
     }

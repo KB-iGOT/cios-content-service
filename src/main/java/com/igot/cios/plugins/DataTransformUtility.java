@@ -40,12 +40,15 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
 
 @Slf4j
 @Component
@@ -850,6 +853,31 @@ public class DataTransformUtility {
         } catch (Exception e) {
             log.error("Error while fetching SSO configuration from Keycloak", e.getMessage());
             throw new CiosContentException("Error while fetching SSO configuration from Keycloak", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String inflateAndDecode(String encoded) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(encoded);
+            Inflater inflater = new Inflater(true);
+            inflater.setInput(decoded);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+
+            while (!inflater.finished()) {
+                int count = inflater.inflate(buffer);
+                baos.write(buffer, 0, count);
+            }
+            inflater.end();
+
+            return baos.toString(StandardCharsets.UTF_8);
+
+        } catch (DataFormatException e) {
+            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
+
+        } catch (Exception e) {
+            throw new CiosContentException("Failed to decode SAMLRequest", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
