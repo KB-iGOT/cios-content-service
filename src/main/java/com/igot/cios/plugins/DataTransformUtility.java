@@ -874,9 +874,11 @@ public class DataTransformUtility {
             return baos.toString(StandardCharsets.UTF_8);
 
         } catch (DataFormatException e) {
+            log.error("Error while inflating SAMLRequest", e.getMessage());
             return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
 
         } catch (Exception e) {
+            log.error("Error while decoding SAMLRequest", e.getMessage());
             throw new CiosContentException("Failed to decode SAMLRequest", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

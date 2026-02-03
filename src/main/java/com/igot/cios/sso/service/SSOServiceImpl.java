@@ -12,6 +12,7 @@ import com.igot.cios.sso.entity.SSOConfiguration;
 import com.igot.cios.sso.repository.SsoRepository;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -30,6 +31,7 @@ import java.util.zip.Inflater;
 import org.w3c.dom.Document;
 
 
+@Slf4j
 @Service
 public class SSOServiceImpl implements SSOService {
 
@@ -513,6 +515,7 @@ public class SSOServiceImpl implements SSOService {
             return validateSamlRequest(samlRequest, client);
 
         } catch (Exception e) {
+            log.error("Exception during SP SAML validation: ", e.getMessage());
             validationResult.put(Constants.SUCCESS, Constants.ACTIVE_STATUS);
             validationResult.put(Constants.MESSAGE, Constants.SP_REDIRECT_EXCEPTION + e.getMessage());
         }
@@ -550,6 +553,7 @@ public class SSOServiceImpl implements SSOService {
             return validationResult;
 
         } catch (Exception e) {
+            log.error("Exception during SAML request validation: ", e.getMessage());
             validationResult.put(Constants.SUCCESS, false);
             validationResult.put(Constants.MESSAGE, Constants.SAML_REQUEST_PARSE_FAILED + e.getMessage());
             return validationResult;
