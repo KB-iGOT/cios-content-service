@@ -154,4 +154,9 @@ public class CbServerProperties {
 
     @Value("${harvard.allowed.file.extensions:.xlsx,.xls,.csv}")
     private String harvardAllowedFileExtensions;
+
+    @Value("${sso.config.read.api}")
+    private String ssoConfigReadApi;
+
+
 }

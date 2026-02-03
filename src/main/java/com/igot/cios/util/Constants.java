@@ -161,6 +161,7 @@ public class Constants {
     public static final String API_SSO_CREATE = "api.sso.create";
     public static final String API_SSO_UPDATE = "api.sso.update";
     public static final String API_SSO_READ = "api.sso.read";
+    public static final String API_SSO_TEST = "api.sso.test";
     public static final String API_UPLOAD_FILE = "api.upload.file";
     public static final String API_UPLOAD_CIOS_LOGS = "api.upload.cios.logs";
     public static final String API_DELETE_CIOS_CONTENT = "api.delete.cios.content";
@@ -209,6 +210,35 @@ public class Constants {
     public static final String ENROLLMENTS = "enrollments";
     public static final String CORNELL_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
     public static final String PATH_DELIMITER = "/";
+    public static final String MISSING_SSO_ID = "Missing ssoId";
+    public static final String COURSE_DEEPLINK = "courseDeeplink";
+    public static final String MISSING_COURSE_DEEPLINK = "Missing courseDeeplink";
+    public static final String HTTP = "http://";
+    public static final String SAML_REQUEST = "SAMLRequest";
+    public static final String USER_AGENT = "User-Agent";
+    public static final String MOZILLA = "Mozilla/5.0";
+    public static final String ISSUER = "Issuer";
+    public static final String ASTERIC = "*";
+    public static final String SP_SAML_FORM_NOTFOUND = "SP did not return SAML form. Status: ";
+    public static final String RESPOND_BODY_NULL = "Response body is null";
+    public static final String SAML_REQUEST_NOTFOUND = "Response does not contain SAMLRequest";
+    public static final String FORM = "form";
+    public static final String INPUT_SAMLREQUEST = "input[name=SAMLRequest]";
+    public static final String MISSING_SAML = "Missing SAML form or SAMLRequest input";
+    public static final String ACTION = "action";
+    public static final String VALUE = "value";
+    public static final String INVALID_SAML = "Invalid SAML form (missing action or SAMLRequest)";
+    public static final String SP_REDIRECT_EXCEPTION = "Exception during SP redirect: ";
+    public static final String SAML_REQUEST_MISSING = "SAML request missing Issuer element";
+    public static final String ISSUER_MISMATCH = "Issuer mismatch. Expected: ";
+    public static final String VALID_SAML_REQUEST = "Valid SAMLRequest - SP successfully sent SAML request with correct Issuer: ";
+    public static final String SAML_REQUEST_PARSE_FAILED = "Failed to parse/validate SAMLRequest: ";
+    public static final String SP_NOTFOUND_IN_KEYCLOAK = "SP not found in Keycloak";
+    public static final String CLIENT_PROTOCOL_NOT_SAML = "Client protocol is not SAML";
+    public static final String MISSING_ASC_URL = "Missing ACS URL in SP configuration";
+    public static final String COURSE_DEEPLINK_MISMATCH = "Course deeplink does not match SP redirect URI domain";
+    public static final String INVALID_COURSE_DEEPLINK = "Invalid courseDeeplink URL";
+
     private Constants() {
     }
 
