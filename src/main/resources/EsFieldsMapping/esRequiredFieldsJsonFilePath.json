@@ -85,5 +85,8 @@
   },
   "courseProvider": {
     "type": "keyword"
+  },
+  "badgeDetails_v1": {
+    "type": "keyword"
   }
 }
