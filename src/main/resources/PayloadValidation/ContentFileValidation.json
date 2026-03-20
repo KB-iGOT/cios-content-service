@@ -93,6 +93,9 @@
         },
         "difficultyLevel": {
             "type": "string"
+        },
+        "badgeDetails_v1": {
+          "type": "keyword"
         }
       },
       "required": [
