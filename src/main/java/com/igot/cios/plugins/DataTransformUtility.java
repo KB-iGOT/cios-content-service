@@ -428,7 +428,7 @@ public class DataTransformUtility {
             try {
                 Map<String, Object> entityMap = objectMapper.convertValue(contentEntity, Map.class);
                 flattenContentData(entityMap);
-                String uniqueId = partnerCode + "_" + contentEntity.getExternalId();
+                String uniqueId =  contentEntity.getPartnerId() + "_" + contentEntity.getExternalId();
                 esUtilService.addDocument(
                         Constants.CIOS_CONTENT_INDEX_NAME,
                         uniqueId,

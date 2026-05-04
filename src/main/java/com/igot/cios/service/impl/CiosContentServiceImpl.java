@@ -323,7 +323,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         repository.save(externalContent);
         Map<String, Object> entityMap = objectMapper.convertValue(externalContent, Map.class);
         dataTransformUtility.flattenContentData(entityMap);
-        String uniqueId = partnerCode + "_" + externalContent.getExternalId();
+        String uniqueId = externalContent.getPartnerId() + "_" + externalContent.getExternalId();
         esUtilService.updateDocument(Constants.CIOS_CONTENT_INDEX_NAME,
                 uniqueId,
                 entityMap,
