@@ -3,6 +3,7 @@ package com.igot.cios.scheduler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cios.dto.RequestBodyDTO;
 import com.igot.cios.dto.SBApiResponse;
@@ -13,6 +14,7 @@ import com.igot.cios.util.CbServerProperties;
 import com.igot.cios.util.Constants;
 import com.igot.cios.util.PayloadValidation;
 import com.igot.cios.util.transactional.cassandrautils.CassandraOperation;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -28,42 +30,29 @@ import java.util.*;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class CornellSchedulerService{
 
-    @Autowired
-    private ObjectMapper objectMapper;
-    @Autowired
-    KafkaProducer kafkaProducer;
-    @Autowired
-    PayloadValidation payloadValidation;
-    @Autowired
-    RestTemplate restTemplate;
-    @Autowired
-    private CbServerProperties cbServerProperties;
-    @Autowired
-    private CassandraOperation cassandraOperation;
-    @Autowired
-    private DataTransformUtility dataTransformUtility;
+    private final ObjectMapper objectMapper;
+    private final KafkaProducer kafkaProducer;
+    private final PayloadValidation payloadValidation;
+    private final RestTemplate restTemplate;
+    private final CbServerProperties cbServerProperties;
+    private final CassandraOperation cassandraOperation;
+    private final DataTransformUtility dataTransformUtility;
 
-    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode eachContentData) {
+    private void callEnrollmentAPI(String partnerCode, String partnerId, JsonNode transformData) {
         try {
             log.info("CornellSchedulerService::callEnrollmentAPI");
-            JsonNode entity = dataTransformUtility.fetchPartnerInfoUsingApi(partnerId);
-            JsonNode specNode = entity.path(Constants.TRANSFORM_PROGRESS_JSON);
-            List<Object> contentJson = objectMapper.convertValue(
-                    specNode,
-                    new TypeReference<List<Object>>() {}
-            );
-            JsonNode transformData = dataTransformUtility.transformData(eachContentData, contentJson);
-            String extCourseId = transformData.get("courseid").asText();
+            String extCourseId = transformData.get(Constants.COURSEID).asText();
             JsonNode result = dataTransformUtility.callCiosReadApi(extCourseId,partnerId);
-            String courseId = result.path("content").get("contentId").asText();
-            String[] parts = transformData.get("userid").asText().split("@");
-            ((ObjectNode) transformData).put("userid", parts[0]);
-            String userId = transformData.get("userid").asText();
+            String courseId = result.path(Constants.CONTENT).get(Constants.CONTENTID).asText();
+            String[] parts = transformData.get(Constants.USER_ID).asText().split("@");
+            ((ObjectNode) transformData).put(Constants.USER_ID, parts[0]);
+            String userId = transformData.get(Constants.USER_ID).asText();
             log.info("courseId  and userid {} {}", courseId, userId);
             Map<String, Object> propertyMap = new HashMap<>();
-            propertyMap.put("userid", userId);
+            propertyMap.put(Constants.USER_ID, userId);
             propertyMap.put(Constants.COURSEID, courseId);
             List<Map<String, Object>> listOfMasterData = cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES, Constants.TABLE_USER_EXTERNAL_ENROLMENTS, propertyMap, null);
             if (!CollectionUtils.isEmpty(listOfMasterData)) {
@@ -98,11 +87,28 @@ public class CornellSchedulerService{
         SBApiResponse apiResponse = SBApiResponse.createDefaultResponse("cornell.enrollment");
 
         try {
-            RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
-            requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
-            requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
-            String payload = objectMapper.writeValueAsString(requestBodyDTO);
-            performEnrollmentCall(cbServerProperties.cornellPartnerCode, payload);
+            int start = 0;
+            int limit = cbServerProperties.getCourseraEnrollmentListLimit();
+            ArrayNode allEnrollmentData = objectMapper.createArrayNode();
+            int total = 0;
+            while (start == 0 || start < total) {
+                RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
+                requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
+                requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
+                String payload = objectMapper.writeValueAsString(requestBodyDTO);
+                JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
+                total = response.path(Constants.COUNT).asInt();
+                JsonNode enrollmentData = response.path(Constants.DATA);
+                if (enrollmentData != null && !enrollmentData.isMissingNode() && enrollmentData.isArray()) {
+                    allEnrollmentData.addAll((ArrayNode) enrollmentData);
+                }
+                start += limit;
+            }
+            JsonNode contentPartnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(cbServerProperties.cornellPartnerCode);
+            String partnerId = contentPartnerInfo.get(Constants.ID).asText();
+            allEnrollmentData.forEach(eachContentData -> {
+                callEnrollmentAPI(cbServerProperties.cornellPartnerCode, partnerId, eachContentData);
+            });
             apiResponse.setResponseCode(HttpStatus.OK);
             return apiResponse;
         } catch (Exception e) {
@@ -128,7 +134,7 @@ public class CornellSchedulerService{
         return urlMap;
     }
 
-    private void performEnrollmentCall(String partnerCode, String requestBody) {
+    private JsonNode performEnrollmentCall(String partnerCode, String requestBody) {
         log.info("CornellSchedulerService :: performEnrollmentCall partnerCode {} and requestBody {}", partnerCode,requestBody);
         String url = cbServerProperties.getServiceLocatorHost() + cbServerProperties.getServiceLocatorFixedUrl();
         HttpHeaders headers = new HttpHeaders();
@@ -141,21 +147,16 @@ public class CornellSchedulerService{
                 Object.class
         );
         if (response.getStatusCode().is2xxSuccessful()) {
-            JsonNode jsonNode = objectMapper.valueToTree(response.getBody());
-            if(!jsonNode.isMissingNode()){
-                JsonNode contentPartnerResponse = dataTransformUtility.fetchPartnerInfoUsingApi(partnerCode);
-                String partnerId = contentPartnerResponse.get(Constants.ID).asText();
-                JsonNode jsonData = jsonNode.path(Constants.ENROLLMENTS);
-                jsonData.forEach(
-                        eachContentData -> {
-                            callEnrollmentAPI(partnerCode, partnerId, eachContentData);
-                        });
+            log.info("CornellSchedulerService :: performEnrollmentCall response");
+            JsonNode jsonData = objectMapper.valueToTree(response.getBody());
+            if(!jsonData.isMissingNode()){
+                return jsonData;
             }else{
                 log.error("Failed to retrieve response data: for partner code {}", partnerCode);
             }
-
         } else {
-            throw new CiosContentException(Constants.ERROR, "Failed to retrieve externalId", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CiosContentException(Constants.ERROR,"Failed to retrieve response from Cornell API " + response.getStatusCode(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
+        return null;
     }
 }

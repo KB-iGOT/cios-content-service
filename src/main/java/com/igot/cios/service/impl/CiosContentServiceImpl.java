@@ -230,7 +230,7 @@ public class CiosContentServiceImpl implements CiosContentService {
                         String status = ciosData.path("content").get("status").asText();
                         if (Constants.NOT_INITIATED.equalsIgnoreCase(status) || Constants.DRAFT.equalsIgnoreCase(status)) {
                             repository.delete(entity);
-                            String uniqueId = deleteContentRequestDto.getPartnerCode() + "_" + entity.getExternalId();
+                            String uniqueId = entity.getPartnerId() + "_" + entity.getExternalId();
                             esUtilService.deleteDocument(uniqueId, Constants.CIOS_CONTENT_INDEX_NAME);
                         } else {
                             errors.add("External ID: " + id + " cannot be deleted because its status is not 'notInitiated'.");
@@ -323,7 +323,7 @@ public class CiosContentServiceImpl implements CiosContentService {
         repository.save(externalContent);
         Map<String, Object> entityMap = objectMapper.convertValue(externalContent, Map.class);
         dataTransformUtility.flattenContentData(entityMap);
-        String uniqueId = partnerCode + "_" + externalContent.getExternalId();
+        String uniqueId = externalContent.getPartnerId() + "_" + externalContent.getExternalId();
         esUtilService.updateDocument(Constants.CIOS_CONTENT_INDEX_NAME,
                 uniqueId,
                 entityMap,

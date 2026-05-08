@@ -69,9 +69,9 @@ public class CourseraSchedulerService {
                 }
                 start += limit;
             }
+            JsonNode contentPartnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(cbServerProperties.courseraPartnerCode);
+            String partnerId = contentPartnerInfo.get("id").asText();
             allEnrollmentData.forEach(eachContentData -> {
-                JsonNode contentPartnerInfo = dataTransformUtility.fetchPartnerInfoUsingApi(cbServerProperties.courseraPartnerCode);
-                String partnerId = contentPartnerInfo.get("id").asText();
                 callEnrollmentAPI(cbServerProperties.courseraPartnerCode, partnerId, eachContentData);
             });
             apiResponse.setResponseCode(HttpStatus.OK);

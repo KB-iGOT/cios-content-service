@@ -238,6 +238,7 @@ public class Constants {
     public static final String MISSING_ASC_URL = "Missing ACS URL in SP configuration";
     public static final String COURSE_DEEPLINK_MISMATCH = "Course deeplink does not match SP redirect URI domain";
     public static final String INVALID_COURSE_DEEPLINK = "Invalid courseDeeplink URL";
+    public static final String COUNT = "count";
 
     private Constants() {
     }
