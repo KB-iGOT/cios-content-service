@@ -1,7 +1,6 @@
 package com.igot.cios.scheduler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -74,25 +73,26 @@ class CornellSchedulerServiceTest {
         Long timestamp = 1706359845000L;
         String result = (String) method.invoke(cornellSchedulerService, timestamp);
 
-        // Verify date format
+        // Verify date format (should be ISO 8601: yyyy-MM-dd'T'HH:mm:ss'Z')
         assertNotNull(result);
         assertFalse(result.isEmpty());
-        assertTrue(result.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"));
+        assertTrue(result.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z"),
+            "Expected ISO 8601 format but got: " + result);
 
         // Verify year is reasonable (2024-2026 range)
         String year = result.substring(0, 4);
         int yearInt = Integer.parseInt(year);
-        assertTrue(yearInt >= 2024 && yearInt <= 2026, "Year should be in reasonable range");
+        assertTrue(yearInt >= 2024 && yearInt <= 2026, "Year should be in reasonable range, got: " + yearInt);
 
         // Verify month is valid (01-12)
         String month = result.substring(5, 7);
         int monthInt = Integer.parseInt(month);
-        assertTrue(monthInt >= 1 && monthInt <= 12, "Month should be between 01-12");
+        assertTrue(monthInt >= 1 && monthInt <= 12, "Month should be between 01-12, got: " + monthInt);
 
         // Verify day is valid (01-31)
         String day = result.substring(8, 10);
         int dayInt = Integer.parseInt(day);
-        assertTrue(dayInt >= 1 && dayInt <= 31, "Day should be between 01-31");
+        assertTrue(dayInt >= 1 && dayInt <= 31, "Day should be between 01-31, got: " + dayInt);
     }
 
     @Test
@@ -211,23 +211,8 @@ class CornellSchedulerServiceTest {
         contentData.put("courseid", "ext-course-123");
         contentData.put("userid", "user123@example.com");
         contentData.put("completedon", "1706359845000");
-        contentData.put("status", "completed");
 
         when(cbServerProperties.getTopic()).thenReturn("test-topic");
-
-        ObjectNode partnerInfo = realObjectMapper.createObjectNode();
-        ObjectNode transformSpec = realObjectMapper.createObjectNode();
-        partnerInfo.set(Constants.TRANSFORM_PROGRESS_JSON, transformSpec);
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(partnerId)).thenReturn(partnerInfo);
-
-        List<Object> contentJson = new ArrayList<>();
-        when(objectMapper.convertValue(any(JsonNode.class), any(TypeReference.class))).thenReturn(contentJson);
-
-        ObjectNode transformedData = realObjectMapper.createObjectNode();
-        transformedData.put("courseid", "ext-course-123");
-        transformedData.put("userid", "user123@example.com");
-        transformedData.put("completedon", "1706359845000");
-        when(dataTransformUtility.transformData(any(), any())).thenReturn(transformedData);
 
         ObjectNode ciosResponse = realObjectMapper.createObjectNode();
         ObjectNode content = realObjectMapper.createObjectNode();
@@ -252,8 +237,6 @@ class CornellSchedulerServiceTest {
 
         verify(kafkaProducer, times(1)).push(anyString(), any());
         verify(payloadValidation, times(1)).validatePayload(anyString(), any());
-        verify(dataTransformUtility, times(1)).fetchPartnerInfoUsingApi(partnerId);
-        verify(dataTransformUtility, times(1)).transformData(any(), any());
         verify(dataTransformUtility, times(1)).callCiosReadApi(anyString(), anyString());
         verify(cassandraOperation, times(1)).getRecordsByProperties(anyString(), anyString(), any(), any());
     }
@@ -267,20 +250,6 @@ class CornellSchedulerServiceTest {
         contentData.put("courseid", "ext-course-123");
         contentData.put("userid", "user123@example.com");
         contentData.put("completedon", "1706359845000");
-
-        ObjectNode partnerInfo = realObjectMapper.createObjectNode();
-        ObjectNode transformSpec = realObjectMapper.createObjectNode();
-        partnerInfo.set(Constants.TRANSFORM_PROGRESS_JSON, transformSpec);
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(partnerId)).thenReturn(partnerInfo);
-
-        List<Object> contentJson = new ArrayList<>();
-        when(objectMapper.convertValue(any(JsonNode.class), any(TypeReference.class))).thenReturn(contentJson);
-
-        ObjectNode transformedData = realObjectMapper.createObjectNode();
-        transformedData.put("courseid", "ext-course-123");
-        transformedData.put("userid", "user123@example.com");
-        transformedData.put("completedon", "1706359845000");
-        when(dataTransformUtility.transformData(any(), any())).thenReturn(transformedData);
 
         ObjectNode ciosResponse = realObjectMapper.createObjectNode();
         ObjectNode content = realObjectMapper.createObjectNode();
@@ -306,8 +275,6 @@ class CornellSchedulerServiceTest {
         verify(payloadValidation, never()).validatePayload(anyString(), any());
 
         // But other services should be called
-        verify(dataTransformUtility, times(1)).fetchPartnerInfoUsingApi(partnerId);
-        verify(dataTransformUtility, times(1)).transformData(any(), any());
         verify(dataTransformUtility, times(1)).callCiosReadApi(anyString(), anyString());
         verify(cassandraOperation, times(1)).getRecordsByProperties(anyString(), anyString(), any(), any());
     }
@@ -321,20 +288,6 @@ class CornellSchedulerServiceTest {
         contentData.put("courseid", "ext-course-123");
         contentData.put("userid", "user123@example.com");
         contentData.put("completedon", "1706359845000");
-
-        ObjectNode partnerInfo = realObjectMapper.createObjectNode();
-        ObjectNode transformSpec = realObjectMapper.createObjectNode();
-        partnerInfo.set(Constants.TRANSFORM_PROGRESS_JSON, transformSpec);
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(partnerId)).thenReturn(partnerInfo);
-
-        List<Object> contentJson = new ArrayList<>();
-        when(objectMapper.convertValue(any(JsonNode.class), any(TypeReference.class))).thenReturn(contentJson);
-
-        ObjectNode transformedData = realObjectMapper.createObjectNode();
-        transformedData.put("courseid", "ext-course-123");
-        transformedData.put("userid", "user123@example.com");
-        transformedData.put("completedon", "1706359845000");
-        when(dataTransformUtility.transformData(any(), any())).thenReturn(transformedData);
 
         ObjectNode ciosResponse = realObjectMapper.createObjectNode();
         ObjectNode content = realObjectMapper.createObjectNode();
@@ -356,8 +309,6 @@ class CornellSchedulerServiceTest {
         verify(payloadValidation, never()).validatePayload(anyString(), any());
 
         // Verify services were called up to enrollment check
-        verify(dataTransformUtility, times(1)).fetchPartnerInfoUsingApi(partnerId);
-        verify(dataTransformUtility, times(1)).transformData(any(), any());
         verify(dataTransformUtility, times(1)).callCiosReadApi(anyString(), anyString());
         verify(cassandraOperation, times(1)).getRecordsByProperties(anyString(), anyString(), any(), any());
     }
@@ -369,8 +320,9 @@ class CornellSchedulerServiceTest {
 
         ObjectNode contentData = realObjectMapper.createObjectNode();
         contentData.put("courseid", "ext-course-123");
+        contentData.put("userid", "user123@example.com");
 
-        when(dataTransformUtility.fetchPartnerInfoUsingApi(partnerId))
+        when(dataTransformUtility.callCiosReadApi(anyString(), anyString()))
                 .thenThrow(new RuntimeException("API call failed"));
 
         Method method = CornellSchedulerService.class.getDeclaredMethod(
