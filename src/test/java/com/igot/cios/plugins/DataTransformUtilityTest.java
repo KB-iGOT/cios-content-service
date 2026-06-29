@@ -347,7 +347,7 @@ class DataTransformUtilityTest {
         verify(cornellContentRepository, times(1)).saveAll(entityList);
         verify(esUtilService, times(1)).addDocument(
             eq(Constants.CIOS_CONTENT_INDEX_NAME),
-            eq(partnerId + "_ext-001"),
+            eq(partnerCode + "_ext-001"),
             anyMap(),
             anyString()
         );
@@ -454,8 +454,8 @@ class DataTransformUtilityTest {
         
         ReflectionTestUtils.invokeMethod(dataTransformUtility, "dataBulkSave", entityList, partnerCode);
 
-       
-        String expectedUniqueId = partnerId + "_" + externalId;
+
+        String expectedUniqueId = partnerCode + "_" + externalId;
         verify(esUtilService, times(1)).addDocument(
             eq(Constants.CIOS_CONTENT_INDEX_NAME),
             eq(expectedUniqueId),
