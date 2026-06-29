@@ -60,7 +60,7 @@ public class CiosContentServiceImplTest {
     void setUp() {
         realObjectMapper = new ObjectMapper();
         partnerCode = "TEST_PARTNER";
-        partnerId = "partner-123";
+       // partnerId = "partner-123";
         externalIds = Arrays.asList("ext-001", "ext-002");
 
         deleteContentRequestDto = new DeleteContentRequestDto();
@@ -298,7 +298,7 @@ public class CiosContentServiceImplTest {
 
         // Only entity1 should be deleted
         verify(repository, times(1)).delete(entity1);
-        verify(esUtilService, times(1)).deleteDocument(eq(partnerId + "_ext-001"), eq(Constants.CIOS_CONTENT_INDEX_NAME));
+        verify(esUtilService, times(1)).deleteDocument(eq(partnerCode + "_ext-001"), eq(Constants.CIOS_CONTENT_INDEX_NAME));
     }
 
     @Test
@@ -365,7 +365,7 @@ public class CiosContentServiceImplTest {
         verify(dataTransformUtility, times(1)).flattenContentData(anyMap());
         verify(esUtilService, times(1)).updateDocument(
             eq(Constants.CIOS_CONTENT_INDEX_NAME),
-            eq(partnerId + "_" + externalId),
+            eq(partnerCode + "_" + externalId),
             anyMap(),
             anyString()
         );
@@ -421,7 +421,7 @@ public class CiosContentServiceImplTest {
         verify(dataTransformUtility, times(1)).flattenContentData(anyMap());
         verify(esUtilService, times(1)).updateDocument(
             eq(Constants.CIOS_CONTENT_INDEX_NAME),
-            eq(partnerId + "_" + externalId),
+            eq(partnerCode + "_" + externalId),
             anyMap(),
             anyString()
         );
@@ -434,7 +434,7 @@ public class CiosContentServiceImplTest {
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         JsonNode transformData = createMockTransformData(externalId, "ES Test Content");
         String elasticPath = "/elastic/mapping.json";
-        String expectedUniqueId = partnerId + "_" + externalId;
+        String expectedUniqueId = partnerCode + "_" + externalId;
 
         when(repository.findByExternalIdAndPartnerId(externalId, partnerId)).thenReturn(Optional.empty());
         when(repository.save(any(CornellContentEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
