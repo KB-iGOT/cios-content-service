@@ -110,7 +110,7 @@ class CornellSchedulerServiceTest {
     @Test
     void testLoadCornellEnrollment_jsonProcessingException() throws JsonProcessingException {
         when(cbServerProperties.getCornellEnrollmentServiceCode()).thenReturn("CORNELL_SERVICE");
-        when(cbServerProperties.getCornellEnrollmentListLimit()).thenReturn("100");
+        when(cbServerProperties.getCornellEnrollmentListLimit()).thenReturn(Integer.valueOf("100"));
         when(cbServerProperties.getCornellEnrollmentListCourseType()).thenReturn("online");
         when(cbServerProperties.getCornellDateRange()).thenReturn(7);
 
@@ -138,41 +138,40 @@ class CornellSchedulerServiceTest {
     @Test
     void testFormUrlMapForEnrollment() throws Exception {
         when(cbServerProperties.getCornellDateRange()).thenReturn(7);
-        when(cbServerProperties.getCornellEnrollmentListLimit()).thenReturn("100");
         when(cbServerProperties.getCornellEnrollmentListCourseType()).thenReturn("online");
 
-        Method method = CornellSchedulerService.class.getDeclaredMethod("formUrlMapForEnrollment");
+        Method method = CornellSchedulerService.class.getDeclaredMethod(
+                "formUrlMapForEnrollment",
+                int.class,
+                int.class);
         method.setAccessible(true);
 
-        Map<String, String> result = (Map<String, String>) method.invoke(cornellSchedulerService);
+        @SuppressWarnings("unchecked")
+        Map<String, String> result =
+                (Map<String, String>) method.invoke(cornellSchedulerService, 0, 100);
 
         // Verify all required fields are present
         assertNotNull(result);
-        assertEquals(4, result.size(), "Map should contain exactly 4 entries");
+        assertEquals(4, result.size());
 
         // Verify offset
-        assertTrue(result.containsKey("offset"));
         assertEquals("0", result.get("offset"));
 
         // Verify limit
-        assertTrue(result.containsKey("limit"));
         assertEquals("100", result.get("limit"));
 
         // Verify course_type
-        assertTrue(result.containsKey("course_type"));
         assertEquals("online", result.get("course_type"));
 
         // Verify completion_range
-        assertTrue(result.containsKey("completion_range"));
         String completionRange = result.get("completion_range");
         assertNotNull(completionRange);
-        assertTrue(completionRange.matches("\\d{8}:\\d{8}"), "Completion range should match format YYYYMMDD:YYYYMMDD");
-        assertTrue(completionRange.contains(":"), "Completion range should contain colon separator");
+        assertTrue(completionRange.matches("\\d{8}:\\d{8}"));
 
         String[] dates = completionRange.split(":");
-        assertEquals(2, dates.length, "Should have start and end date");
-        assertEquals(8, dates[0].length(), "Start date should be 8 digits");
-        assertEquals(8, dates[1].length(), "End date should be 8 digits");
+        assertEquals(2, dates.length);
+        assertEquals(8, dates[0].length());
+        assertEquals(8, dates[1].length());
     }
 
     @Test

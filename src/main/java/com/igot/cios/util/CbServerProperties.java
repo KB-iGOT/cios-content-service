@@ -30,7 +30,7 @@ public class CbServerProperties {
     private String cornellEnrollmentServiceCode;
 
     @Value("${cornell.enrollment.list.limit}")
-    private String cornellEnrollmentListLimit;
+    private int cornellEnrollmentListLimit;
 
     @Value("${cornell.enrollment.list.course_type}")
     private String cornellEnrollmentListCourseType;
