@@ -23,6 +23,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -361,6 +362,10 @@ public class DataTransformUtility {
                     String[] parts = durationString.split(" ");
                     String duration = String.valueOf(Integer.parseInt(parts[0]));
                     ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.DURATION, duration).asText();
+                }
+                JsonNode courseTypeNode = eachContentData.path(Constants.CONTENT).path(Constants.COURSE_TYPE);
+                if (courseTypeNode.isMissingNode() || courseTypeNode.isNull() || StringUtils.isBlank(courseTypeNode.asText())) {
+                    ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.COURSE_TYPE, Constants.COURSE_TYPE_PAID);
                 }
                 ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.FILE_ID, fileId).asText();
                 ((ObjectNode) eachContentData.path(Constants.CONTENT)).put(Constants.SOURCE, fileName).asText();
