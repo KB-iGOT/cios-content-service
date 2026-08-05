@@ -88,13 +88,13 @@ public class CornellSchedulerService{
 
         try {
             int start = 0;
-            int limit = cbServerProperties.getCourseraEnrollmentListLimit();
+            int limit = cbServerProperties.getCornellEnrollmentListLimit();
             ArrayNode allEnrollmentData = objectMapper.createArrayNode();
             int total = 0;
             while (start == 0 || start < total) {
                 RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
                 requestBodyDTO.setServiceCode(cbServerProperties.getCornellEnrollmentServiceCode());
-                requestBodyDTO.setUrlMap(formUrlMapForEnrollment());
+                requestBodyDTO.setUrlMap(formUrlMapForEnrollment(start, limit));
                 String payload = objectMapper.writeValueAsString(requestBodyDTO);
                 JsonNode response = performEnrollmentCall(cbServerProperties.courseraPartnerCode, payload);
                 total = response.path(Constants.COUNT).asInt();
@@ -120,15 +120,15 @@ public class CornellSchedulerService{
         }
     }
 
-    private Map<String, String> formUrlMapForEnrollment() {
+    private Map<String, String> formUrlMapForEnrollment(int start, int limit) {
         DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
         LocalDate today = LocalDate.now();
         LocalDate startDate = today.minusDays(cbServerProperties.getCornellDateRange()); // Adjust the range as needed
         String completionRange = startDate.format(FORMATTER) + ":" + today.format(FORMATTER);
         log.info("Completion Range {}", completionRange);
         Map<String, String> urlMap = new HashMap<>();
-        urlMap.put("offset", "0");
-        urlMap.put("limit", cbServerProperties.getCornellEnrollmentListLimit());
+        urlMap.put("offset", String.valueOf(start));
+        urlMap.put("limit", String.valueOf(limit));
         urlMap.put("course_type", cbServerProperties.getCornellEnrollmentListCourseType());
         urlMap.put("completion_range", completionRange);
         return urlMap;
