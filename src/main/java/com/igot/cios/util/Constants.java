@@ -171,6 +171,11 @@ public class Constants {
     public static final String ADMIN_CLI = "admin-cli";
     public static final String ACCESS_TOKEN = "access_token";
     public static final String COURSE_PROVIDER = "courseProvider";
+    public static final String COURSE_TYPE = "courseType";
+    public static final String COURSE_TYPE_PAID = "paid";
+    public static final String COURSE_TYPE_FREE = "free";
+    public static final String COURSE_ENROL_LIMIT = "courseEnrolLimit";
+    public static final String REQUIRED_KARMA_POINTS = "requiredKarmaPoints";
     public static final String INCLUDE_AUTH_STATEMENT = "includeAuthnStatement";
     public static final String SIGN_DOCUMENTS = "signDocuments";
     public static final String OPTIMIZE_REDIRECT_SIGNING_KEYLOOKUP = "optimizeRedirectSigningKeyLookup";
