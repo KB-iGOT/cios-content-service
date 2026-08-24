@@ -88,5 +88,14 @@
   },
   "badgeDetails_v1": {
     "type": "keyword"
+  },
+  "courseType": {
+    "type": "keyword"
+  },
+  "courseEnrolLimit": {
+    "type": "long"
+  },
+  "requiredKarmaPoints": {
+    "type": "long"
   }
 }
