@@ -122,6 +122,14 @@
 			<artifactId>java-jwt</artifactId>
 			<version>4.4.0</version>
 		</dependency>
+		<!-- LTI 1.3 Platform: signs id_tokens and SERVES a JWK Set.
+		     Nimbus rather than java-jwt above because a Platform must publish a
+		     JWKS, which Nimbus models first-class (JWKSet / RSAKey). -->
+		<dependency>
+			<groupId>com.nimbusds</groupId>
+			<artifactId>nimbus-jose-jwt</artifactId>
+			<version>9.37.3</version>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-csv</artifactId>
