@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>iGOT LTI 1.3 Platform — Admin</title>
+  <style>
+    :root { --ink:#1d2330; --muted:#667085; --rule:#e3e6ec; --accent:#6d2e91; --bg:#fbfbfd; --good:#1f7a3d; }
+    * { box-sizing:border-box; }
+    body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; margin:0;
+           background:var(--bg); color:var(--ink); line-height:1.5; }
+    .wrap { max-width:1060px; margin:0 auto; padding:40px 28px 72px; }
+    h1 { font-size:26px; margin:0 0 6px; letter-spacing:-0.01em; }
+    .sub { color:var(--muted); margin:0 0 32px; font-size:14px; }
+    h2 { font-size:17px; margin:36px 0 12px; padding-top:18px; border-top:1px solid var(--rule); }
+    .card { background:#fff; border:1px solid var(--rule); border-radius:10px; padding:18px 20px; }
+    table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    th,td { text-align:left; padding:8px 9px; border-bottom:1px solid var(--rule); vertical-align:top; }
+    th { color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; }
+    code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px;
+           background:#f2f1f7; padding:2px 6px; border-radius:4px; word-break:break-all; }
+    form.inline { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    form.inline label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+    form.inline input { width:100%; padding:7px 9px; border:1px solid var(--rule);
+                        border-radius:6px; font-size:13px; font-family:inherit; }
+    form.inline .full { grid-column:1/-1; }
+    button { background:var(--accent); color:#fff; border:0; border-radius:6px;
+             padding:8px 15px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+    button.ghost { background:transparent; color:var(--muted); border:1px solid var(--rule); }
+    .row-actions { display:flex; gap:7px; flex-wrap:wrap; }
+    .empty { color:var(--muted); font-size:13.5px; font-style:italic; }
+    .hint { font-size:12.5px; color:var(--muted); margin:10px 0 0; }
+    .pill { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eef0f4; color:var(--muted); }
+    .pill.good { background:#e8f5ec; color:var(--good); }
+    .err { color:#b23a48; font-size:13px; margin-top:8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>iGOT LTI 1.3 Platform — admin</h1>
+  <p class="sub">cios-content-service · iGOT as LTI Platform, Moodle as Tool. Core launch, AGS, Deep Linking.</p>
+
+  <h2>1. Platform details — paste these into Moodle</h2>
+  <div class="card">
+    <table id="platform-table">
+      <tr><th>Platform ID (issuer)</th><td id="pc-issuer">loading…</td></tr>
+      <tr><th>Authentication request URL</th><td id="pc-authUrl">loading…</td></tr>
+      <tr><th>Access token URL</th><td id="pc-tokenUrl">loading…</td></tr>
+      <tr><th>Public keyset URL</th><td id="pc-jwksUrl">loading…</td></tr>
+      <tr><th>Active signing key id</th><td id="pc-kid">loading…</td></tr>
+    </table>
+    <p class="hint">
+      In Moodle: <em>Site administration → Plugins → Enrolments → Publish as LTI tool → Tool registration</em>.
+      The Client ID below comes from the registration you add in section 2.
+    </p>
+  </div>
+
+  <h2>2. Registered providers (Moodle sites)</h2>
+  <div class="card">
+    <table id="providers-table"><tbody></tbody></table>
+    <p class="empty" id="providers-empty" style="display:none">No providers registered yet.</p>
+
+    <h3 style="font-size:14px;margin:22px 0 10px;">Register a provider</h3>
+    <form class="inline" id="provider-form">
+      <div class="full">
+        <label>Provider name</label>
+        <input name="providerName" placeholder="Moodle (UAT)" required/>
+      </div>
+      <div>
+        <label>Partner code</label>
+        <input name="partnerCode" placeholder="IGOT-MOODLE-UAT" required/>
+      </div>
+      <div>
+        <label>Partner id</label>
+        <input name="partnerId" placeholder="moodle-uat-1" required/>
+      </div>
+      <div>
+        <label>Initiate login URL (from Moodle)</label>
+        <input name="initiateLoginUri" placeholder="https://moodle.example/enrol/lti/login.php" required/>
+      </div>
+      <div>
+        <label>Redirect / Tool URL</label>
+        <input name="redirectUris" placeholder="https://moodle.example/enrol/lti/launch.php" required/>
+      </div>
+      <div>
+        <label>Public keyset (JWKS) URL</label>
+        <input name="jwksUri" placeholder="https://moodle.example/enrol/lti/jwks.php" required/>
+      </div>
+      <div>
+        <label>Deep Linking URL (optional)</label>
+        <input name="deepLinkingUri" placeholder="https://moodle.example/enrol/lti/dl_launch.php"/>
+      </div>
+      <div class="full"><button type="submit">Add registration</button></div>
+    </form>
+    <p class="err" id="provider-error"></p>
+  </div>
+
+  <h2>3. Resource links (catalog)</h2>
+  <div class="card">
+    <table id="links-table"><tbody></tbody></table>
+    <p class="empty" id="links-empty" style="display:none">
+      Nothing yet. Use Deep Linking above for providers with a picker, or add one manually.
+    </p>
+
+    <h3 style="font-size:14px;margin:22px 0 10px;">Add a resource link manually</h3>
+    <form class="inline" id="link-form">
+      <div>
+        <label>Registration id</label>
+        <input name="registrationId" placeholder="(from the table above)" required/>
+      </div>
+      <div>
+        <label>Title</label>
+        <input name="title" placeholder="Public Policy 101" required/>
+      </div>
+      <div class="full">
+        <label>Target link URI (Moodle launch URL, not a public link)</label>
+        <input name="targetLinkUri" placeholder="https://moodle.example/enrol/lti/launch.php?id=..." required/>
+      </div>
+      <div class="full"><button type="submit">Add resource link</button></div>
+    </form>
+    <p class="err" id="link-error"></p>
+  </div>
+
+  <h2>4. Signing keys</h2>
+  <div class="card">
+    <table id="keys-table"><tbody></tbody></table>
+    <form id="rotate-form" style="margin-top:14px">
+      <button type="submit" class="ghost">Rotate signing key</button>
+    </form>
+  </div>
+
+</div>
+
+<script>
+const api = (path, opts) => fetch('/ciosIntegration/v1/lti/admin' + path, opts).then(r => {
+  if (!r.ok) return r.json().then(e => { throw new Error(JSON.stringify(e)); });
+  return r.status === 204 ? null : r.json();
+});
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+async function loadPlatformConfig() {
+  const cfg = await api('/platform-config');
+  document.getElementById('pc-issuer').innerHTML = '<code>' + escapeHtml(cfg.issuer) + '</code>';
+  document.getElementById('pc-authUrl').innerHTML = '<code>' + escapeHtml(cfg.authenticationRequestUrl) + '</code>';
+  document.getElementById('pc-tokenUrl').innerHTML = '<code>' + escapeHtml(cfg.accessTokenUrl) + '</code>';
+  document.getElementById('pc-jwksUrl').innerHTML = '<code>' + escapeHtml(cfg.publicKeysetUrl) + '</code>';
+  document.getElementById('pc-kid').innerHTML = '<code>' + escapeHtml(cfg.activeKid) + '</code>';
+}
+
+async function loadProviders() {
+  const rows = await api('/providers');
+  const tbody = document.querySelector('#providers-table tbody');
+  document.getElementById('providers-empty').style.display = rows.length ? 'none' : 'block';
+  tbody.innerHTML = rows.length ? [
+    '<tr><th>Name</th><th>Client ID</th><th>Id (for links)</th><th>Deep Linking</th><th>Status</th><th></th></tr>'
+  ].join('') + rows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.providerName)}</td>
+      <td><code>${escapeHtml(r.clientId)}</code></td>
+      <td><code>${escapeHtml(r.id)}</code></td>
+      <td>${r.deepLinkingUri ? '<span class="pill good">yes</span>' : '<span class="pill">none</span>'}</td>
+      <td><span class="pill good">${escapeHtml(r.status)}</span></td>
+      <td class="row-actions">
+        ${r.deepLinkingUri ? `<a href="/ciosIntegration/v1/lti/deeplink/initiate/${encodeURIComponent(r.id)}?userId=demo-author-1"><button type="button">Pick content</button></a>` : ''}
+        <button type="button" class="ghost" onclick="deleteProvider('${r.id}')">Remove</button>
+      </td>
+    </tr>`).join('') : '';
+}
+
+async function loadLinks() {
+  const rows = await api('/resource-links');
+  const tbody = document.querySelector('#links-table tbody');
+  document.getElementById('links-empty').style.display = rows.length ? 'none' : 'block';
+  tbody.innerHTML = rows.length ? [
+    '<tr><th>Title</th><th>Target link URI</th><th></th></tr>'
+  ].join('') + rows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.title)}</td>
+      <td><code>${escapeHtml(r.targetLinkUri)}</code></td>
+      <td class="row-actions">
+        <a href="/ciosIntegration/v1/lti/launch/${encodeURIComponent(r.id)}?userId=demo-learner-1"><button type="button">Launch</button></a>
+        <button type="button" class="ghost" onclick="deleteLink('${r.id}')">Remove</button>
+      </td>
+    </tr>`).join('') : '';
+}
+
+async function loadKeys() {
+  const rows = await api('/keys');
+  const tbody = document.querySelector('#keys-table tbody');
+  tbody.innerHTML = [
+    '<tr><th>Kid</th><th>Algorithm</th><th>Status</th><th>Created</th></tr>'
+  ].join('') + rows.map(k => `
+    <tr>
+      <td><code>${escapeHtml(k.kid)}</code></td>
+      <td>${escapeHtml(k.algorithm)}</td>
+      <td><span class="pill ${k.status === 'active' ? 'good' : ''}">${escapeHtml(k.status)}</span></td>
+      <td>${escapeHtml(k.createdDate)}</td>
+    </tr>`).join('');
+}
+
+async function refreshAll() {
+  await Promise.all([loadPlatformConfig(), loadProviders(), loadLinks(), loadKeys()]);
+}
+
+window.deleteProvider = async (id) => { await api('/providers/' + id, { method: 'DELETE' }); refreshAll(); };
+window.deleteLink = async (id) => { await api('/resource-links/' + id, { method: 'DELETE' }); refreshAll(); };
+
+document.getElementById('provider-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('provider-error');
+  errEl.textContent = '';
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  try {
+    await api('/providers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    e.target.reset();
+    refreshAll();
+  } catch (err) { errEl.textContent = 'Failed: ' + err.message; }
+});
+
+document.getElementById('link-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('link-error');
+  errEl.textContent = '';
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  try {
+    await api('/resource-links', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    e.target.reset();
+    refreshAll();
+  } catch (err) { errEl.textContent = 'Failed: ' + err.message; }
+});
+
+document.getElementById('rotate-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await api('/keys/rotate', { method: 'POST' });
+  refreshAll();
+});
+
+refreshAll();
+</script>
+</body>
+</html>
