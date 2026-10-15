@@ -68,7 +68,8 @@ public class LtiLaunchController {
                 .queryParam("client_id", reg.getClientId())
                 .queryParam("lti_deployment_id", reg.getDeploymentId())
                 .queryParam("lti_message_hint", messageHint)
-                .build(true)
+                .build()
+                .encode()
                 .toUriString();
 
         log.debug("LTI leg 1 redirect -> {}", url);
