@@ -240,78 +240,7 @@ public class Constants {
     public static final String INVALID_COURSE_DEEPLINK = "Invalid courseDeeplink URL";
     public static final String COUNT = "count";
 
-    public static final String API_LTI_OIDC_TEST = "api.lti.oidc.test";
-    public static final String LTI_CONFIGURATION = "ltiConfiguration";
-    public static final String LTI = "LTI";
-    public static final String LTI_VERSION = "ltiVersion";
-    public static final String LTI_VERSION_1_3 = "1.3";
-    public static final String OIDC_LOGIN_INITIATION_URL = "oidcLoginInitiationUrl";
-    public static final String REDIRECT_LAUNCH_URL = "redirectLaunchUrl";
-    public static final String DEPLOYMENT_ID = "deploymentId";
-    public static final String ISS = "iss";
-    public static final String LOGIN_HINT = "login_hint";
-    public static final String TARGET_LINK_URI = "target_link_uri";
-    public static final String CLIENT_ID_QUERY_PARAM = "client_id";
-    public static final String LTI_DEPLOYMENT_ID = "lti_deployment_id";
-    public static final String LTI_MESSAGE_HINT = "lti_message_hint";
-    public static final String DEFAULT_LTI_LOGIN_HINT = "demo-learner-1";
-    public static final String DEFAULT_LTI_MESSAGE_HINT = "test-hint";
-    public static final String MISSING_PARTNER_CODE = "Missing mandatory parameter: partnerCode";
-    public static final String PARTNER_NOT_FOUND = "Partner not found for code: ";
-    public static final String PARTNER_PROTOCOL_NOT_LTI = "Partner protocol is not LTI for code: ";
-    public static final String LTI_CONFIGURATION_NOT_FOUND = "LTI configuration not found for partner: ";
-    public static final String UNSUPPORTED_LTI_VERSION = "Unsupported LTI version, only LTI 1.3 is supported for partner: ";
-    public static final String MISSING_OIDC_LOGIN_INITIATION_URL = "Missing oidcLoginInitiationUrl in LTI configuration for partner: ";
-    public static final String OIDC_CONNECTION_TEST_FAILED = "Tool is not redirecting to the expected platform issuer/client_id for partner: ";
-    public static final String ALL_CHECKS_PASSED = "All checks passed.";
-    public static final String HTTPS_SCHEME = "https";
-
-    public static final String INVALID_OIDC_LOGIN_INITIATION_URL = "oidcLoginInitiationUrl must be a valid HTTPS URL for partner: ";
-    public static final String MISSING_CLIENT_ID = "Missing mandatory field: clientId for partner: ";
-    public static final String MISSING_DEPLOYMENT_ID = "Missing mandatory field: deploymentId for partner: ";
-    public static final String MISSING_REDIRECT_LAUNCH_URL = "redirectLaunchUrl must be a valid HTTPS URL for partner: ";
-    public static final String TOOL_ISSUER = "toolIssuer";
-    public static final String MISSING_TOOL_ISSUER = "Missing mandatory field: toolIssuer for partner: ";
-    public static final String INVALID_TOOL_ISSUER = "toolIssuer must be a valid HTTPS URL for partner: ";
-
-    public static final String DISALLOWED_HOST = "Refused to connect to a disallowed/internal host: ";
-    public static final String UNEXPECTED_RESPONSE_PREFIX = "The LTI tool responded with HTTP ";
-    public static final String UNEXPECTED_RESPONSE_GUIDANCE = " instead of redirecting to the platform as expected. "
-            + "Check that the oidcLoginInitiationUrl configured for this partner is correct and that LTI 1.3 "
-            + "third-party-initiated login is enabled for this registration on the tool. Partner: ";
-    public static final String TOOL_REJECTED_REQUEST = "The LTI tool could not recognize the platform registration. "
-            + "Please verify the registration configuration and ensure it is active on the tool.";
-    public static final String DNS_RESOLUTION_FAILED = "DNS resolution failed for tool host, partner: ";
-    public static final String TLS_HANDSHAKE_FAILED = "TLS handshake failed while connecting to tool, partner: ";
-    public static final String CONNECTION_TIMED_OUT = "Connection to tool timed out for partner: ";
-    public static final String CONNECTION_REFUSED = "Connection to tool was refused for partner: ";
-    public static final String MAX_REDIRECTS_EXCEEDED = "Exceeded max redirect hops without reaching platform issuer for partner: ";
-
-    public static final String WELL_KNOWN_OPENID_CONFIGURATION_PATH = "/.well-known/openid-configuration";
-    public static final String OIDC_ISSUER_FIELD = "issuer";
-    public static final String AUTHORIZATION_ENDPOINT = "authorization_endpoint";
-    public static final String TOKEN_ENDPOINT = "token_endpoint";
-    public static final String JWKS_URI = "jwks_uri";
-    public static final String KEYS = "keys";
-    public static final String KTY = "kty";
-    public static final String KID = "kid";
-    public static final String OIDC_DISCOVERY_UNREACHABLE = "Unable to connect to the platform's authentication configuration endpoint. "
-            + "Please verify that the configured toolIssuer is correct and accessible.";
-    public static final String OIDC_DISCOVERY_INVALID_RESPONSE = "The platform returned an invalid authentication configuration. "
-            + "Please verify the configured toolIssuer.";
-    public static final String OIDC_DISCOVERY_MISSING_ISSUER = "The platform's authentication configuration is missing the required platform identifier. "
-            + "Please verify the configured toolIssuer.";
-    public static final String OIDC_DISCOVERY_ISSUER_MISMATCH_EXPECTED = "The configured toolIssuer does not match the platform identifier returned by the platform. Expected: ";
-    public static final String OIDC_DISCOVERY_ISSUER_MISMATCH_FOUND = ". Found: ";
-    public static final String OIDC_DISCOVERY_MISSING_ENDPOINTS = "The platform's authentication configuration is missing required endpoints. "
-            + "Please verify the configured toolIssuer and the platform's authentication configuration.";
-    public static final String OIDC_JWKS_UNREACHABLE = "Unable to retrieve the platform's public signing keys. "
-            + "Please verify that the configured toolPublicJwksUrl is correct and accessible.";
-    public static final String OIDC_JWKS_EMPTY = "The platform did not provide any public signing keys. "
-            + "Please verify the configured toolPublicJwksUrl and the platform's signing key configuration.";
-    public static final String OIDC_JWKS_MALFORMED_KEY = "The platform's public signing key configuration contains an invalid key. "
-            + "Please verify the configured toolPublicJwksUrl and the platform's signing keys.";
-
     private Constants() {
     }
+
 }
