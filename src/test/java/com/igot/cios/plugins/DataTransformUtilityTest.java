@@ -3,6 +3,7 @@ package com.igot.cios.plugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.igot.cios.dto.LogStatus;
 import com.igot.cios.entity.CornellContentEntity;
 import com.igot.cios.entity.FileInfoEntity;
 import com.igot.cios.exception.CiosContentException;
@@ -57,6 +58,7 @@ class DataTransformUtilityTest {
         objectMapper = new ObjectMapper();
         MockitoAnnotations.openMocks(this);
         ReflectionTestUtils.setField(dataTransformUtility, "objectMapper", objectMapper);
+        ReflectionTestUtils.setField(dataTransformUtility, "logStatus", new LogStatus());
     }
 
     // ---------------- getAdminAccessToken ----------------
@@ -584,6 +586,64 @@ class DataTransformUtilityTest {
             any(HttpEntity.class),
             eq(String.class)
         );
+    }
+
+    // ---------------- updateProcessedDataInDb: courseType defaulting ----------------
+
+    @Test
+    void updateProcessedDataInDb_defaultsCourseTypeToPaid_whenMissing() {
+        JsonNode transformed = contentPayload(null);
+        JsonNode result = invokeUpdateProcessedDataInDbAndCaptureTransformed(transformed);
+
+        assertEquals(Constants.COURSE_TYPE_PAID, result.get(0).path(Constants.CONTENT).path(Constants.COURSE_TYPE).asText());
+    }
+
+    @Test
+    void updateProcessedDataInDb_defaultsCourseTypeToPaid_whenBlank() {
+        JsonNode transformed = contentPayload("");
+        JsonNode result = invokeUpdateProcessedDataInDbAndCaptureTransformed(transformed);
+
+        assertEquals(Constants.COURSE_TYPE_PAID, result.get(0).path(Constants.CONTENT).path(Constants.COURSE_TYPE).asText());
+    }
+
+    @Test
+    void updateProcessedDataInDb_preservesExistingCourseType_whenPresent() {
+        JsonNode transformed = contentPayload("free");
+        JsonNode result = invokeUpdateProcessedDataInDbAndCaptureTransformed(transformed);
+
+        assertEquals("free", result.get(0).path(Constants.CONTENT).path(Constants.COURSE_TYPE).asText());
+    }
+
+    private ObjectNode contentPayload(String courseType) {
+        ObjectNode content = objectMapper.createObjectNode();
+        if (courseType != null) {
+            content.put(Constants.COURSE_TYPE, courseType);
+        }
+        ObjectNode eachContentData = objectMapper.createObjectNode();
+        eachContentData.set(Constants.CONTENT, content);
+        return eachContentData;
+    }
+
+    @SuppressWarnings("unchecked")
+    private JsonNode invokeUpdateProcessedDataInDbAndCaptureTransformed(JsonNode transformedContentData) {
+        DataTransformUtility spyUtility = spy(dataTransformUtility);
+        doReturn(transformedContentData).when(spyUtility).transformData(any(), anyList());
+        doReturn(new HashMap<>()).when(spyUtility).validatePayloadAndWriteLogsToFile(
+                anyString(), any(JsonNode.class), anyString(), anyString(), anyString(), anyString(), any(Timestamp.class));
+
+        spyUtility.updateProcessedDataInDb(
+                List.of(Map.of("name", "Test Content")),
+                "TEST_PARTNER",
+                "file.csv",
+                "file-id-1",
+                "partner-id-1",
+                Collections.emptyList()
+        );
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        verify(spyUtility).validatePayloadAndWriteLogsToFile(
+                anyString(), captor.capture(), anyString(), anyString(), anyString(), anyString(), any(Timestamp.class));
+        return captor.getValue();
     }
 
     private CornellContentEntity createMockContentEntity(String externalId, String partnerId, String partnerCode) {
