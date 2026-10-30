@@ -185,17 +185,13 @@ public class LtiServiceImpl implements LtiService {
             HttpURLConnection connection = null;
             try {
                 URL url = new URL(currentUrl);
-                InetAddress address = InetAddress.getByName(url.getHost());
+                InetAddress address = resolveAddress(url.getHost());
                 if (isDisallowedAddress(address)) {
                     log.error("LtiServiceImpl::checkToolReachability: refusing to connect to disallowed host {} for partner {}", url.getHost(), partnerCode);
                     return Constants.DISALLOWED_HOST + url.getHost();
                 }
 
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setInstanceFollowRedirects(false);
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
-                connection.setReadTimeout(CONNECTION_TIMEOUT_MS);
+                connection = openConnection(currentUrl);
                 if (!cookieJar.isEmpty()) {
                     connection.setRequestProperty("Cookie", buildCookieHeader(cookieJar));
                 }
@@ -333,5 +329,18 @@ public class LtiServiceImpl implements LtiService {
         response.getParams().setErrmsg(errorMessage);
         response.setResponseCode(httpStatus);
         return response;
+    }
+
+    InetAddress resolveAddress(String host) throws UnknownHostException {
+        return InetAddress.getByName(host);
+    }
+
+    HttpURLConnection openConnection(String urlString) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
+        connection.setInstanceFollowRedirects(false);
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
+        connection.setReadTimeout(CONNECTION_TIMEOUT_MS);
+        return connection;
     }
 }
