@@ -295,19 +295,22 @@ public class Constants {
     public static final String KEYS = "keys";
     public static final String KTY = "kty";
     public static final String KID = "kid";
-    public static final String OIDC_DISCOVERY_UNREACHABLE = "Could not reach the platform's OIDC discovery endpoint (.well-known/openid-configuration). "
-            + "Check that the configured toolIssuer is correct and that this server has network access to it.";
-    public static final String OIDC_DISCOVERY_INVALID_RESPONSE = "The platform's OIDC discovery endpoint did not return a valid response. "
-            + "Check that the configured toolIssuer points directly at the platform's realm, with no trailing path.";
-    public static final String OIDC_DISCOVERY_MISSING_ISSUER = "The platform's OIDC discovery document did not include an issuer field. "
-            + "This usually means a proxy or firewall between this server and the platform is intercepting the request "
-            + "instead of the platform itself responding.";
-    public static final String OIDC_DISCOVERY_ISSUER_MISMATCH_EXPECTED = "The platform's OIDC discovery document reports a different issuer than configured. Expected: ";
+    public static final String OIDC_DISCOVERY_UNREACHABLE = "Unable to connect to the platform's authentication configuration endpoint. "
+            + "Please verify that the configured toolIssuer is correct and accessible.";
+    public static final String OIDC_DISCOVERY_INVALID_RESPONSE = "The platform returned an invalid authentication configuration. "
+            + "Please verify the configured toolIssuer.";
+    public static final String OIDC_DISCOVERY_MISSING_ISSUER = "The platform's authentication configuration is missing the required platform identifier. "
+            + "Please verify the configured toolIssuer.";
+    public static final String OIDC_DISCOVERY_ISSUER_MISMATCH_EXPECTED = "The configured toolIssuer does not match the platform identifier returned by the platform. Expected: ";
     public static final String OIDC_DISCOVERY_ISSUER_MISMATCH_FOUND = ". Found: ";
-    public static final String OIDC_DISCOVERY_MISSING_ENDPOINTS = "Platform OIDC discovery document is missing required endpoints";
-    public static final String OIDC_JWKS_UNREACHABLE = "Unable to reach platform JWKS endpoint";
-    public static final String OIDC_JWKS_EMPTY = "Platform JWKS endpoint returned no keys";
-    public static final String OIDC_JWKS_MALFORMED_KEY = "Platform JWKS contains a malformed key entry";
+    public static final String OIDC_DISCOVERY_MISSING_ENDPOINTS = "The platform's authentication configuration is missing required endpoints. "
+            + "Please verify the configured toolIssuer and the platform's authentication configuration.";
+    public static final String OIDC_JWKS_UNREACHABLE = "Unable to retrieve the platform's public signing keys. "
+            + "Please verify that the configured toolPublicJwksUrl is correct and accessible.";
+    public static final String OIDC_JWKS_EMPTY = "The platform did not provide any public signing keys. "
+            + "Please verify the configured toolPublicJwksUrl and the platform's signing key configuration.";
+    public static final String OIDC_JWKS_MALFORMED_KEY = "The platform's public signing key configuration contains an invalid key. "
+            + "Please verify the configured toolPublicJwksUrl and the platform's signing keys.";
 
     private Constants() {
     }
