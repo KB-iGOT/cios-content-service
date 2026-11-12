@@ -52,13 +52,15 @@ class DataTransformUtilityTest {
     @Mock
     private CornellContentRepository cornellContentRepository;
 
+    @Mock
+    private LogStatus logStatus;
+
 
     @BeforeEach
     void setup() {
         objectMapper = new ObjectMapper();
         MockitoAnnotations.openMocks(this);
         ReflectionTestUtils.setField(dataTransformUtility, "objectMapper", objectMapper);
-        ReflectionTestUtils.setField(dataTransformUtility, "logStatus", new LogStatus());
     }
 
     // ---------------- getAdminAccessToken ----------------
@@ -586,6 +588,86 @@ class DataTransformUtilityTest {
             any(HttpEntity.class),
             eq(String.class)
         );
+    }
+
+    // ---------------- updateProcessedDataInDb :: courseType defaulting ----------------
+
+    @Test
+    void updateProcessedDataInDb_defaultsCourseTypeToPaid_whenFieldMissing() {
+        JsonNode transformedContent = buildTransformedContent(content -> {
+            // courseType intentionally not set
+        });
+        JsonNode result = runUpdateProcessedDataInDbAndCaptureTransformedContent(transformedContent);
+
+        assertEquals(Constants.COURSE_TYPE_PAID, result.path(Constants.COURSE_TYPE).asText());
+    }
+
+    @Test
+    void updateProcessedDataInDb_defaultsCourseTypeToPaid_whenFieldIsNull() {
+        JsonNode transformedContent = buildTransformedContent(content -> content.putNull(Constants.COURSE_TYPE));
+        JsonNode result = runUpdateProcessedDataInDbAndCaptureTransformedContent(transformedContent);
+
+        assertEquals(Constants.COURSE_TYPE_PAID, result.path(Constants.COURSE_TYPE).asText());
+    }
+
+    @Test
+    void updateProcessedDataInDb_defaultsCourseTypeToPaid_whenFieldIsBlank() {
+        JsonNode transformedContent = buildTransformedContent(content -> content.put(Constants.COURSE_TYPE, "   "));
+        JsonNode result = runUpdateProcessedDataInDbAndCaptureTransformedContent(transformedContent);
+
+        assertEquals(Constants.COURSE_TYPE_PAID, result.path(Constants.COURSE_TYPE).asText());
+    }
+
+    @Test
+    void updateProcessedDataInDb_preservesExistingCourseType_whenAlreadyFree() {
+        JsonNode transformedContent = buildTransformedContent(content -> content.put(Constants.COURSE_TYPE, Constants.COURSE_TYPE_FREE));
+        JsonNode result = runUpdateProcessedDataInDbAndCaptureTransformedContent(transformedContent);
+
+        assertEquals(Constants.COURSE_TYPE_FREE, result.path(Constants.COURSE_TYPE).asText());
+    }
+
+    @Test
+    void updateProcessedDataInDb_preservesExistingCourseType_whenAlreadyPaid() {
+        JsonNode transformedContent = buildTransformedContent(content -> content.put(Constants.COURSE_TYPE, Constants.COURSE_TYPE_PAID));
+        JsonNode result = runUpdateProcessedDataInDbAndCaptureTransformedContent(transformedContent);
+
+        assertEquals(Constants.COURSE_TYPE_PAID, result.path(Constants.COURSE_TYPE).asText());
+    }
+
+    private JsonNode buildTransformedContent(java.util.function.Consumer<ObjectNode> contentCustomizer) {
+        ObjectNode content = objectMapper.createObjectNode();
+        content.put(Constants.NAME, "Test Course");
+        contentCustomizer.accept(content);
+        ObjectNode root = objectMapper.createObjectNode();
+        root.set(Constants.CONTENT, content);
+        return root;
+    }
+
+    @SuppressWarnings("unchecked")
+    private JsonNode runUpdateProcessedDataInDbAndCaptureTransformedContent(JsonNode transformedContent) {
+        DataTransformUtility spyUtility = Mockito.spy(dataTransformUtility);
+        doReturn(transformedContent).when(spyUtility).transformData(any(), anyList());
+        doReturn(new HashMap<String, Object>())
+                .when(spyUtility)
+                .validatePayloadAndWriteLogsToFile(anyString(), any(JsonNode.class), anyString(), anyString(), anyString(), anyString(), any(Timestamp.class));
+
+        List<Map<String, String>> transformData = new ArrayList<>();
+        transformData.add(new HashMap<>());
+
+        spyUtility.updateProcessedDataInDb(transformData, "TEST_PARTNER", "file.csv", "file-id-1", "partner-id-1", new ArrayList<>());
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        verify(spyUtility).validatePayloadAndWriteLogsToFile(
+                eq(Constants.DATA_PAYLOAD_VALIDATION_FILE),
+                captor.capture(),
+                eq("file.csv"),
+                eq("TEST_PARTNER"),
+                eq("file-id-1"),
+                eq("partner-id-1"),
+                any(Timestamp.class)
+        );
+
+        return captor.getValue().get(0).path(Constants.CONTENT);
     }
 
     // ---------------- updateProcessedDataInDb: courseType defaulting ----------------
